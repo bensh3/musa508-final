@@ -59,24 +59,24 @@ library(tidyverse)
 library(tidytransit)
 library(gganimate)
 library(sf)
-library(lubridate)
 ```
 
 
-```{r intake delay data}
+```{r intake delay data, echo=FALSE, message=FALSE}
 delay_files <- list.files("delay",pattern="^20")
 delay <- lapply(paste0('delay/',delay_files),read_csv)
 names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement = "")
 ```
 
 ```{r intake GTFS data}
-njt <- read_gtfs("gtfs_njt.zip",files=c("agency","calendar_dates","routes",
-                                        "shapes","stop_times","stops","trips"))
+njt <- read_gtfs("gtfs_njt.zip")
 njt_sf <- gtfs_as_sf(njt)
 
-amtk <- read_gtfs("gtfs_amtk.zip",files=c("agency","calendar","routes",
-                                        "stop_times","stops","transfers","trips"))
-
+amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
+amtk_sf <- gtfs_as_sf(amtk)
 ```
 
+```{r}
+njt <- set_servicepattern(njt)
+```
 
