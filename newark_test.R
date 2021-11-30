@@ -5,6 +5,10 @@ library(lubridate)
 library(dplyr)
 library(readr)
 
+Mar18 <- read.csv("2018_03.csv")
+Apr18 <- read.csv("2018_04.csv")
+AGG <- rbind(Mar18, Apr18)
+
 Newark_DEP <- filter(AGG, to=="Newark Penn Station"|type=="NJ Transit")
 
 Newark_DEP <- filter(AGG, to=="Newark Penn Station")%>%
