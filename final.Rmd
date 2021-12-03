@@ -55,10 +55,12 @@ knitr::opts_chunk$set(fig.path = 'figs/',
 ```
 
 ```{r}
+library(data.table)
+library(gganimate)
+library(lubridate)
+library(sf)
 library(tidyverse)
 library(tidytransit)
-library(gganimate)
-library(sf)
 ```
 
 
@@ -76,7 +78,26 @@ amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
 amtk_sf <- gtfs_as_sf(amtk)
 ```
 
-```{r}
+```{r define time periods}
 
+```
+
+
+```{r 2019 delay data}
+necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
+  filter(type == 'NJ Transit' & line == 'Northeast Corrdr' &
+           date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1)) %>% 
+  arrange(date,train_id,stop_sequence)
+
+necl.eb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'Trenton') %>% 
+  distinct(train_id) %>% unlist()
+necl.wb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'New York Penn Station') %>% 
+  distinct(train_id) %>% unlist()
+```
+
+```{r}
+necl2019 %>% filter(train_id %in% sample(necl.eb.id,10)) %>%
+  ggplot(aes(x=stop_sequence,y=delay_minutes,color=train_id)) +
+  geom_line()
 ```
 

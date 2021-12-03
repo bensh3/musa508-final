@@ -7,8 +7,8 @@ library(readr)
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 
-Mar18 <- read.csv("2018_03.csv")
-Apr18 <- read.csv("2018_04.csv")
+Mar18 <- read.csv("delay/2018_03.csv")
+Apr18 <- read.csv("delay/2018_04.csv")
 AGG <- rbind(Mar18, Apr18)
 
 Newark_DEP <- filter(AGG, to=="Newark Penn Station"|type=="NJ Transit")
