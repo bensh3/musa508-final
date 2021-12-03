@@ -5,6 +5,8 @@ library(lubridate)
 library(dplyr)
 library(readr)
 
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+
 Mar18 <- read.csv("2018_03.csv")
 Apr18 <- read.csv("2018_04.csv")
 AGG <- rbind(Mar18, Apr18)
@@ -50,5 +52,61 @@ Newark_NY_DEP %>%
   ggplot(aes(Day,delay_minutes)) + 
   geom_point() + geom_smooth(method = "lm", se= FALSE) +
   labs(title="NJT NY-bound trains at Newark Penn Delay by Day",
+       x="Hour", y="delay") +
+  plotTheme()
+
+#Look at trains more than 10 mins late
+Severedelay <- Newark_NY_DEP%>%
+  filter(delay_minutes>15)%>%
+  mutate(Hour = hour(scheduled_time),
+         day = format(scheduled_time, format="%m-%d"))
+
+Severedelay %>%
+  group_by(interval60) %>% 
+  summarize(delay_minutes,
+            Hour = hour(scheduled_time)) %>%
+  ggplot(aes(Hour,delay_minutes)) + 
+  geom_point() + geom_smooth(method = "lm", se= FALSE) +
+  labs(title="NJT NY-bound trains with >15min late at Newark Penn Delay by hours of the day",
+       x="Hour", y="delay") +
+  plotTheme()
+
+#trains that often have >20min delay
+summary(as.factor(Severedelay$train_id))
+
+#by day
+Severedelay %>%
+  group_by(interval60) %>% 
+  summarize(delay_minutes,
+            Day = date(scheduled_time)) %>%
+  ggplot(aes(Day,delay_minutes)) + 
+  geom_point() + geom_smooth(method = "lm", se= FALSE) +
+  labs(title="NJT NY-bound trains with >15min late at Newark Penn Delay by Day",
+       x="Hour", y="delay") +
+  plotTheme()
+
+summary(as.factor(Severedelay$day))
+
+#What about trains with little delays
+Smalldelay <- Newark_NY_DEP%>%
+  filter(delay_minutes<15)
+
+Smalldelay %>%
+  group_by(interval60) %>% 
+  summarize(delay_minutes,
+            Hour = hour(scheduled_time)) %>%
+  ggplot(aes(Hour,delay_minutes)) + 
+  geom_point() + geom_smooth(method = "lm", se= FALSE) +
+  labs(title="NJT NY-bound trains with <15min late at Newark Penn Delay by hours of the day",
+       x="Hour", y="delay") +
+  plotTheme()
+
+Smalldelay %>%
+  group_by(interval60) %>% 
+  summarize(delay_minutes,
+            Day = date(scheduled_time)) %>%
+  ggplot(aes(Day,delay_minutes)) + 
+  geom_point() + geom_smooth(method = "lm", se= FALSE) +
+  labs(title="NJT NY-bound trains with <15min late at Newark Penn Delay by Day",
        x="Hour", y="delay") +
   plotTheme()
