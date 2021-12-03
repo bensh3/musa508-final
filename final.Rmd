@@ -57,6 +57,7 @@ knitr::opts_chunk$set(fig.path = 'figs/',
 ```{r}
 library(data.table)
 library(gganimate)
+library(hms)
 library(lubridate)
 library(sf)
 library(tidyverse)
@@ -80,24 +81,34 @@ amtk_sf <- gtfs_as_sf(amtk)
 
 ```{r define time periods}
 
+int.ampeak <- interval(as_hms("05:00:00"),as_hms("10:00:00"))
+int.midday <- interval(as_hms("10:00:01"),as_hms("16:00:00"))
+int.pmpeak <- interval(as_hms("16:00:01"),as_hms("20:00:00"))
+int.evening <- interval(as_hms("20:00:01"),as_hms("23:00:00"))
+int.overnight <- interval(as_hms("23:00:01"),as_hms("04:59:59"))
+
 ```
 
 
 ```{r 2019 delay data}
 necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
-  filter(type == 'NJ Transit' & line == 'Northeast Corrdr' &
-           date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1)) %>% 
+  filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
   arrange(date,train_id,stop_sequence)
 
-necl.eb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'Trenton') %>% 
-  distinct(train_id) %>% unlist()
-necl.wb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'New York Penn Station') %>% 
-  distinct(train_id) %>% unlist()
-```
+necl20190618 <- necl2019 %>% 
+  filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
 
+necl.eb.id <- necl20190618 %>% filter(stop_sequence == 1 & from == 'Trenton') %>% 
+  distinct(train_id)
+necl.wb.id <- necl20190618 %>% filter(stop_sequence == 1 & from == 'New York Penn Station') %>% 
+  distinct(train_id)
+```
+  
 ```{r}
-necl2019 %>% filter(train_id %in% sample(necl.eb.id,10)) %>%
+necl20190618 %>% filter(train_id %in% sample(necl.eb.id,10)) %>%
   ggplot(aes(x=stop_sequence,y=delay_minutes,color=train_id)) +
   geom_line()
 ```
+
+
 
