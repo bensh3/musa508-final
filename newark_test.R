@@ -86,6 +86,12 @@ Severedelay %>%
   plotTheme()
 
 summary(as.factor(Severedelay$day))
+summary(as.factor(Severedelay$dotw))
+Severedelay_sat <- filter(Severedelay, dotw==6)
+#03-01 morning (11), 03-02 afternoon (26), 03-08 morning, 03-09 morning, 03-16 morning...
+#04-05 evening, 04-13 evening, 04-23 morning, 04-24 evening...
+#I just realized "Explosive cyclogenesis" in NYC in the beginning of March 2018!
+#and snow around March 10
 
 #What about trains with little delays
 Smalldelay <- Newark_NY_DEP%>%
