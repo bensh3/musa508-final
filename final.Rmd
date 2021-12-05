@@ -66,8 +66,11 @@ library(tidytransit)
 
 
 ```{r intake delay data, echo=FALSE, message=FALSE}
+invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
+invalid$date <- invalid$date %>% str_replace_all("_","-") %>% as.Date()
+
 delay_files <- list.files("delay",pattern="^20")
-delay <- lapply(paste0('delay/',delay_files),read_csv)
+delay <- lapply(paste0('delay/',delay_files),read_csv) %>% map(anti_join,invalid,by=c("date","train_id"))
 names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement = "")
 ```
 
@@ -80,13 +83,11 @@ amtk_sf <- gtfs_as_sf(amtk)
 ```
 
 ```{r define time periods}
-
 int.ampeak <- interval(as_hms("05:00:00"),as_hms("10:00:00"))
 int.midday <- interval(as_hms("10:00:01"),as_hms("16:00:00"))
 int.pmpeak <- interval(as_hms("16:00:01"),as_hms("20:00:00"))
 int.evening <- interval(as_hms("20:00:01"),as_hms("23:00:00"))
 int.overnight <- interval(as_hms("23:00:01"),as_hms("04:59:59"))
-
 ```
 
 
@@ -95,17 +96,17 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
   filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
   arrange(date,train_id,stop_sequence)
 
-necl20190618 <- necl2019 %>% 
+necl.oneday <- necl2019 %>% 
   filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
 
-necl.eb.id <- necl20190618 %>% filter(stop_sequence == 1 & from == 'Trenton') %>% 
-  distinct(train_id)
-necl.wb.id <- necl20190618 %>% filter(stop_sequence == 1 & from == 'New York Penn Station') %>% 
-  distinct(train_id)
+necl.eb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'Trenton') %>% 
+  distinct(train_id,date)
+necl.wb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'New York Penn Station') %>% 
+  distinct(train_id,date)
 ```
   
 ```{r}
-necl20190618 %>% filter(train_id %in% sample(necl.eb.id,10)) %>%
+necl.oneday %>% filter(train_id %in% sample(filter(necl.eb.id, date == ymd('20190618')),10)) %>%
   ggplot(aes(x=stop_sequence,y=delay_minutes,color=train_id)) +
   geom_line()
 ```
