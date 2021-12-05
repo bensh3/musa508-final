@@ -91,25 +91,7 @@ amtk_sf <- gtfs_as_sf(amtk)
 necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
   filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
   arrange(date,train_id,stop_sequence) %>% 
-  filter(complete.cases(.)) %>% 
-  mutate(station_id_c = case_when(
-    from == "Trenton" ~ 1,
-    from == "Hamilton" ~ 2,
-    from == "Princeton Junction" ~ 3,
-    from == "Jersey Avenue" ~ 4,
-    from == "New Brunswick" ~ 5,
-    from == "Edison" ~ 6,
-    from == "Metuchen" ~ 7,
-    from == "Metropark" ~ 8,
-    from == "Rahway" ~ 9,
-    from == "Linden" ~ 10,
-    from == "Elizabeth" ~ 11,
-    from == "North Elizabeth" ~ 12,
-    from == "Newark Airport" ~ 13,
-    from == "Newark Penn Station" ~ 14,
-    from == "Secaucus Upper Lvl" ~ 15,
-    from == "New York Penn Station" ~ 16,
-  )) %>% mutate(period = case_when(
+  filter(complete.cases(.)) %>% mutate(period = case_when(
       ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.ampeak  ~ "AM peak",
       ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.midday  ~ "Midday",
       ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.pmpeak  ~ "PM peak",
@@ -119,7 +101,41 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
    ) %>% mutate(direction = case_when(
     stop_sequence == 1 & from == 'Trenton' ~ 'eastbound',
     stop_sequence == 1 & from == 'New York Penn Station' ~ 'westbound'
-  )) %>% fill(direction)
+  )) %>% fill(direction) %>% 
+  mutate(station_id_c = case_when(
+    from == "Trenton" & direction == 'eastbound' ~ 1,
+    from == "Hamilton" & direction == 'eastbound' ~ 2,
+    from == "Princeton Junction" & direction == 'eastbound' ~ 3,
+    from == "Jersey Avenue" & direction == 'eastbound' ~ 4,
+    from == "New Brunswick" & direction == 'eastbound' ~ 5,
+    from == "Edison" & direction == 'eastbound' ~ 6,
+    from == "Metuchen" & direction == 'eastbound' ~ 7,
+    from == "Metropark" & direction == 'eastbound' ~ 8,
+    from == "Rahway" & direction == 'eastbound' ~ 9,
+    from == "Linden" & direction == 'eastbound' ~ 10,
+    from == "Elizabeth" & direction == 'eastbound' ~ 11,
+    from == "North Elizabeth" & direction == 'eastbound' ~ 12,
+    from == "Newark Airport" & direction == 'eastbound' ~ 13,
+    from == "Newark Penn Station" & direction == 'eastbound' ~ 14,
+    from == "Secaucus Upper Lvl" & direction == 'eastbound' ~ 15,
+    from == "New York Penn Station" & direction == 'eastbound' ~ 16,
+    from == "Trenton" & direction == 'westbound' ~ 16,
+    from == "Hamilton" & direction == 'westbound' ~ 15,
+    from == "Princeton Junction" & direction == 'westbound' ~ 14,
+    from == "Jersey Avenue" & direction == 'westbound' ~ 13,
+    from == "New Brunswick" & direction == 'westbound' ~ 12,
+    from == "Edison" & direction == 'westbound' ~ 11,
+    from == "Metuchen" & direction == 'westbound' ~ 10,
+    from == "Metropark" & direction == 'westbound' ~ 9,
+    from == "Rahway" & direction == 'westbound' ~ 8,
+    from == "Linden" & direction == 'westbound' ~ 7,
+    from == "Elizabeth" & direction == 'westbound' ~ 6,
+    from == "North Elizabeth" & direction == 'westbound' ~ 5,
+    from == "Newark Airport" & direction == 'westbound' ~ 4,
+    from == "Newark Penn Station" & direction == 'westbound' ~ 3,
+    from == "Secaucus Upper Lvl" & direction == 'westbound' ~ 2,
+    from == "New York Penn Station" & direction == 'westbound' ~ 1,
+  )) 
 ```
 
 ```{r get unique train IDs per day}
@@ -129,22 +145,25 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
 necl.id <- necl2019 %>% distinct(train_id,date,direction)
 ```
   
-```{r schedule deviance: summarise by time period, fig.width=8, fig.height=6}
+```{r schedule deviance: summarise by time period, fig.width=8, fig.height=5}
 p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_sequence) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
   ggplot(aes(x=stop_sequence, y=avgdelay)) +
   geom_line() +
-  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight")))
+  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
+  ggtitle('Weekday')
 p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_sequence) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
   ggplot(aes(x=stop_sequence, y=avgdelay)) +
   geom_line() +
-  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight")))
+  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
+  ggtitle('Weekend')
 
 p1 / p2
 ```
 
 ```{r stringline diagram}
+
 
 ```
 
