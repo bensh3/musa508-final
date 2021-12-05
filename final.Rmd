@@ -57,8 +57,11 @@ library(lubridate)
 library(patchwork)
 library(scales)
 library(sf)
+library(riem)
 library(tidyverse)
 library(tidytransit)
+
+source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
 ```
 
 ```{r define time periods}
@@ -195,4 +198,45 @@ oneday %>%
     facet_grid(rows=vars(direction))
 ```
 
+
+## Weather
+
+```{r weather}
+weather.DataNWK <- 
+  riem_measures(station = "EWR", date_start = "2019-03-01", date_end = "2019-10-31")
+
+weather.PanelNWK <-  
+  weather.DataNWK %>%
+  mutate_if(is.character, list(~replace(as.character(.), is.na(.), "0"))) %>% 
+  replace(is.na(.), 0) %>%
+  mutate(interval60 = ymd_h(substr(valid, 1, 13))) %>%
+  mutate(week = week(interval60),
+         dotw = wday(interval60, label=TRUE)) %>%
+  group_by(interval60) %>%
+  summarize(Temperature = max(tmpf),
+            Percipitation = sum(p01i),
+            Huminity = mean(relh),
+            Wind_Speed = max(sknt)) %>%
+  mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
+
+grid.arrange(top = "Weather Data - Newark, NJ - March, April 2018",
+             ggplot(weather.PanelNWK, aes(interval60,Percipitation)) + geom_line() + 
+               labs(title="Percipitation", x="Hour", y="Percipitation") + plotTheme(),
+             ggplot(weather.PanelNWK, aes(interval60,Wind_Speed)) + geom_line() + 
+               labs(title="Wind Speed", x="Hour", y="Wind Speed") + plotTheme(),
+             ggplot(weather.PanelNWK, aes(interval60,Temperature)) + geom_line() + 
+               labs(title="Temperature", x="Hour", y="Temperature") + plotTheme(),
+             ggplot(weather.PanelNWK, aes(interval60,Huminity)) + geom_line() + 
+               labs(title="Huminity", x="Hour", y="Huminity") + plotTheme())
+```
+
+```{r weatherjoin}
+necl2019 <- necl2019%>%
+  mutate(interval60 = floor_date(scheduled_time, unit = "hour"),
+         week = week(scheduled_time),
+         dotw = wday(scheduled_time),
+         trip_count = 1)%>%
+  left_join(weather.PanelNWK, by = "interval60")%>%
+  na.omit()
+```
 
