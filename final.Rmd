@@ -5,7 +5,10 @@ description: |
 date: "2021-10-22"
 author:
   - name: "Benjamin She"
-url: https://github.com/bensh3/
+  - url: https://github.com/bensh3/
+author:
+  - name: "Lechuan Huang"
+  - url: https://github.com/bensh3/
 output:
   distill::distill_article:
     toc: true
@@ -15,15 +18,6 @@ editor_options:
   markdown: 
   wrap: sentence
   chunk_output_type: inline
-knit: (function(input, ...) {
-    rmarkdown::render(
-      input,
-      output_file = paste0(
-        xfun::sans_ext(input), '_BenShe.html'
-      ),
-      envir = globalenv()
-    )
-  })
 ---
   <style>
   html {
@@ -59,18 +53,28 @@ library(data.table)
 library(gganimate)
 library(hms)
 library(lubridate)
+library(patchwork)
 library(sf)
 library(tidyverse)
 library(tidytransit)
 ```
 
+```{r define time periods}
+int.ampeak <- interval(as_hms("05:00:00"),as_hms("10:00:00"))
+int.midday <- interval(as_hms("10:00:01"),as_hms("16:00:00"))
+int.pmpeak <- interval(as_hms("16:00:01"),as_hms("20:00:00"))
+int.evening <- interval(as_hms("20:00:01"),as_hms("23:59:59"))
+int.overngt <- interval(as_hms("00:00:00"),as_hms("04:59:59"))
+```
 
 ```{r intake delay data, echo=FALSE, message=FALSE}
 invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
 invalid$date <- invalid$date %>% str_replace_all("_","-") %>% as.Date()
 
 delay_files <- list.files("delay",pattern="^20")
-delay <- lapply(paste0('delay/',delay_files),read_csv) %>% map(anti_join,invalid,by=c("date","train_id"))
+delay <- lapply(paste0('delay/',delay_files),read_csv) %>% 
+  map(anti_join,invalid,by=c("date","train_id"))
+
 names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement = "")
 ```
 
@@ -82,34 +86,66 @@ amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
 amtk_sf <- gtfs_as_sf(amtk)
 ```
 
-```{r define time periods}
-int.ampeak <- interval(as_hms("05:00:00"),as_hms("10:00:00"))
-int.midday <- interval(as_hms("10:00:01"),as_hms("16:00:00"))
-int.pmpeak <- interval(as_hms("16:00:01"),as_hms("20:00:00"))
-int.evening <- interval(as_hms("20:00:01"),as_hms("23:00:00"))
-int.overnight <- interval(as_hms("23:00:01"),as_hms("04:59:59"))
-```
 
-
-```{r 2019 delay data}
+```{r 2019 NEC line delay data}
 necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
   filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
-  arrange(date,train_id,stop_sequence)
+  arrange(date,train_id,stop_sequence) %>% 
+  filter(complete.cases(.)) %>% 
+  mutate(station_id_c = case_when(
+    from == "Trenton" ~ 1,
+    from == "Hamilton" ~ 2,
+    from == "Princeton Junction" ~ 3,
+    from == "Jersey Avenue" ~ 4,
+    from == "New Brunswick" ~ 5,
+    from == "Edison" ~ 6,
+    from == "Metuchen" ~ 7,
+    from == "Metropark" ~ 8,
+    from == "Rahway" ~ 9,
+    from == "Linden" ~ 10,
+    from == "Elizabeth" ~ 11,
+    from == "North Elizabeth" ~ 12,
+    from == "Newark Airport" ~ 13,
+    from == "Newark Penn Station" ~ 14,
+    from == "Secaucus Upper Lvl" ~ 15,
+    from == "New York Penn Station" ~ 16,
+  )) %>% mutate(period = case_when(
+      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.ampeak  ~ "AM peak",
+      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.midday  ~ "Midday",
+      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.pmpeak  ~ "PM peak",
+      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.evening  ~ "Evening",
+      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.overngt  ~ "Overnight"
+  )) %>% mutate(isWkdy = ifelse(wday(date) %in% c(2,3,4,5,6),TRUE,FALSE)
+   ) %>% mutate(direction = case_when(
+    stop_sequence == 1 & from == 'Trenton' ~ 'eastbound',
+    stop_sequence == 1 & from == 'New York Penn Station' ~ 'westbound'
+  )) %>% fill(direction)
+```
 
-necl.oneday <- necl2019 %>% 
-  filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
+```{r get unique train IDs per day}
+# necl.oneday <- necl2019 %>% 
+#   filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
 
-necl.eb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'Trenton') %>% 
-  distinct(train_id,date)
-necl.wb.id <- necl2019 %>% filter(stop_sequence == 1 & from == 'New York Penn Station') %>% 
-  distinct(train_id,date)
+necl.id <- necl2019 %>% distinct(train_id,date,direction)
 ```
   
-```{r}
-necl.oneday %>% filter(train_id %in% sample(filter(necl.eb.id, date == ymd('20190618')),10)) %>%
-  ggplot(aes(x=stop_sequence,y=delay_minutes,color=train_id)) +
-  geom_line()
+```{r schedule deviance: summarise by time period, fig.width=8, fig.height=6}
+p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_sequence) %>%
+  summarise(avgdelay = mean(delay_minutes)) %>% 
+  ggplot(aes(x=stop_sequence, y=avgdelay)) +
+  geom_line() +
+  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight")))
+p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_sequence) %>%
+  summarise(avgdelay = mean(delay_minutes)) %>% 
+  ggplot(aes(x=stop_sequence, y=avgdelay)) +
+  geom_line() +
+  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight")))
+
+p1 / p2
 ```
 
+```{r stringline diagram}
+
+```
 
 
