@@ -1,0 +1,346 @@
+      YEAR,MONTH          ,CATEGORY                                                    ,CANCEL_COUNT,CANCEL_TOTAL,CANCEL_PERCENTAGE
+----------,---------------,------------------------------------------------------------,------------,------------,-----------------
+      2017,JANUARY        ,AMTRAK                                                      ,          29,          51,             56.9
+      2021,JANUARY        ,Unpreventable                                               ,           3,          36,              8.3
+      2017,JANUARY        ,Human Factor                                                ,           2,          51,              3.9
+      2017,JANUARY        ,Mechanical                                                  ,          15,          51,             29.4
+      2017,JANUARY        ,Unpreventable                                               ,           4,          51,              7.8
+      2018,JANUARY        ,AMTRAK                                                      ,          16,          78,             20.5
+      2018,JANUARY        ,Carryover/Other                                             ,           1,          78,              1.3
+      2018,JANUARY        ,Crew/Engineer Availability                                  ,           7,          78,                9
+      2018,JANUARY        ,Equipment Availability                                      ,          34,          78,             43.6
+      2018,JANUARY        ,Human Factor                                                ,           1,          78,              1.3
+      2018,JANUARY        ,Infrastructure Engineering                                  ,           6,          78,              7.7
+      2018,JANUARY        ,Mechanical                                                  ,           5,          78,              6.4
+      2018,JANUARY        ,Unpreventable                                               ,           8,          78,             10.3
+      2019,JANUARY        ,AMTRAK                                                      ,           2,          59,              3.4
+      2019,JANUARY        ,Crew/Engineer Availability                                  ,           5,          59,              8.5
+      2019,JANUARY        ,Equipment Availability                                      ,          32,          59,             54.2
+      2019,JANUARY        ,Mechanical                                                  ,          12,          59,             20.3
+      2019,JANUARY        ,Unpreventable                                               ,           8,          59,             13.6
+      2020,JANUARY        ,Crew/Engineer Availability                                  ,          21,          45,             46.7
+      2020,JANUARY        ,Equipment Availability                                      ,           5,          45,             11.1
+      2020,JANUARY        ,Human Factor                                                ,           1,          45,              2.2
+      2020,JANUARY        ,Mechanical                                                  ,          14,          45,             31.1
+      2020,JANUARY        ,Technologies                                                ,           2,          45,              4.4
+      2020,JANUARY        ,Unpreventable                                               ,           2,          45,              4.4
+      2021,JANUARY        ,AMTRAK                                                      ,           2,          36,              5.6
+      2021,JANUARY        ,Crew/Engineer Availability                                  ,           1,          36,              2.8
+      2021,JANUARY        ,Equipment Availability                                      ,           8,          36,             22.2
+      2021,JANUARY        ,Human Factor                                                ,           4,          36,             11.1
+      2021,JANUARY        ,Infrastructure Engineering                                  ,           1,          36,              2.8
+      2021,JANUARY        ,Mechanical                                                  ,          17,          36,             47.2
+      2017,JANUARY        ,Crew/Engineer Availability                                  ,           1,          51,                2
+      2017,FEBRUARY       ,AMTRAK                                                      ,           6,          39,             15.4
+      2021,FEBRUARY       ,Unpreventable                                               ,          15,          40,             37.5
+      2017,FEBRUARY       ,Crew/Engineer Availability                                  ,           2,          39,              5.1
+      2017,FEBRUARY       ,Human Factor                                                ,          11,          39,             28.2
+      2017,FEBRUARY       ,Mechanical                                                  ,           7,          39,             17.9
+      2017,FEBRUARY       ,Unpreventable                                               ,          11,          39,             28.2
+      2018,FEBRUARY       ,AMTRAK                                                      ,          10,          28,             35.7
+      2018,FEBRUARY       ,Crew/Engineer Availability                                  ,           6,          28,             21.4
+      2018,FEBRUARY       ,Equipment Availability                                      ,           1,          28,              3.6
+      2018,FEBRUARY       ,Mechanical                                                  ,           8,          28,             28.6
+      2018,FEBRUARY       ,Unpreventable                                               ,           3,          28,             10.7
+      2019,FEBRUARY       ,AMTRAK                                                      ,           4,          35,             11.4
+      2019,FEBRUARY       ,Crew/Engineer Availability                                  ,           6,          35,             17.1
+      2019,FEBRUARY       ,Equipment Availability                                      ,           6,          35,             17.1
+      2019,FEBRUARY       ,Human Factor                                                ,           2,          35,              5.7
+      2019,FEBRUARY       ,Mechanical                                                  ,          11,          35,             31.4
+      2019,FEBRUARY       ,Technologies                                                ,           4,          35,             11.4
+      2019,FEBRUARY       ,Unpreventable                                               ,           2,          35,              5.7
+      2020,FEBRUARY       ,AMTRAK                                                      ,          12,          28,             42.9
+      2020,FEBRUARY       ,Crew/Engineer Availability                                  ,           2,          28,              7.1
+      2020,FEBRUARY       ,Equipment Availability                                      ,           2,          28,              7.1
+      2020,FEBRUARY       ,Mechanical                                                  ,           5,          28,             17.9
+      2020,FEBRUARY       ,Technologies                                                ,           4,          28,             14.3
+      2020,FEBRUARY       ,Unpreventable                                               ,           3,          28,             10.7
+      2021,FEBRUARY       ,Crew/Engineer Availability                                  ,           3,          40,              7.5
+      2021,FEBRUARY       ,Mechanical                                                  ,          22,          40,               55
+      2017,FEBRUARY       ,Carryover/Other                                             ,           2,          39,              5.1
+      2017,MARCH          ,AMTRAK                                                      ,          39,          56,             69.6
+      2021,MARCH          ,Unpreventable                                               ,           3,          23,               13
+      2017,MARCH          ,Human Factor                                                ,           1,          56,              1.8
+      2017,MARCH          ,Mechanical                                                  ,           4,          56,              7.1
+      2017,MARCH          ,Unpreventable                                               ,           9,          56,             16.1
+      2018,MARCH          ,AMTRAK                                                      ,          39,          69,             56.5
+      2018,MARCH          ,Crew/Engineer Availability                                  ,           1,          69,              1.4
+      2018,MARCH          ,Mechanical                                                  ,          13,          69,             18.8
+      2018,MARCH          ,Other Railroads                                             ,           4,          69,              5.8
+      2018,MARCH          ,Unpreventable                                               ,          12,          69,             17.4
+      2019,MARCH          ,Crew/Engineer Availability                                  ,           3,          24,             12.5
+      2019,MARCH          ,Equipment Availability                                      ,           3,          24,             12.5
+      2019,MARCH          ,Human Factor                                                ,           1,          24,              4.2
+      2019,MARCH          ,Infrastructure Engineering                                  ,           1,          24,              4.2
+      2019,MARCH          ,Mechanical                                                  ,           9,          24,             37.5
+      2019,MARCH          ,Other                                                       ,           1,          24,              4.2
+      2019,MARCH          ,Technologies                                                ,           6,          24,               25
+      2020,MARCH          ,AMTRAK                                                      ,          12,          47,             25.5
+      2020,MARCH          ,Crew/Engineer Availability                                  ,          20,          47,             42.6
+      2020,MARCH          ,Equipment Availability                                      ,           3,          47,              6.4
+      2020,MARCH          ,Mechanical                                                  ,           6,          47,             12.8
+      2020,MARCH          ,Technologies                                                ,           2,          47,              4.3
+      2020,MARCH          ,Unpreventable                                               ,           4,          47,              8.5
+      2021,MARCH          ,AMTRAK                                                      ,           2,          23,              8.7
+      2021,MARCH          ,Human Factor                                                ,           3,          23,               13
+      2021,MARCH          ,Mechanical                                                  ,          15,          23,             65.2
+      2017,MARCH          ,Crew/Engineer Availability                                  ,           3,          56,              5.4
+      2017,APRIL          ,AMTRAK                                                      ,          37,          58,             63.8
+      2021,APRIL          ,Mechanical                                                  ,          13,          24,             54.2
+      2017,APRIL          ,Crew/Engineer Availability                                  ,           1,          58,              1.7
+      2017,APRIL          ,Equipment Availability                                      ,           1,          58,              1.7
+      2017,APRIL          ,Human Factor                                                ,           2,          58,              3.4
+      2017,APRIL          ,Infrastructure Engineering                                  ,           1,          58,              1.7
+      2017,APRIL          ,Mechanical                                                  ,           4,          58,              6.9
+      2017,APRIL          ,Unpreventable                                               ,           1,          58,              1.7
+      2018,APRIL          ,AMTRAK                                                      ,           6,          33,             18.2
+      2018,APRIL          ,Crew/Engineer Availability                                  ,          11,          33,             33.3
+      2018,APRIL          ,Human Factor                                                ,           2,          33,              6.1
+      2018,APRIL          ,Mechanical                                                  ,           6,          33,             18.2
+      2018,APRIL          ,Unpreventable                                               ,           8,          33,             24.2
+      2019,APRIL          ,Crew/Engineer Availability                                  ,           2,          82,              2.4
+      2019,APRIL          ,Equipment Availability                                      ,           3,          82,              3.7
+      2019,APRIL          ,Human Factor                                                ,           3,          82,              3.7
+      2019,APRIL          ,Mechanical                                                  ,          12,          82,             14.6
+      2019,APRIL          ,Technologies                                                ,           2,          82,              2.4
+      2019,APRIL          ,Unpreventable                                               ,          60,          82,             73.2
+      2020,APRIL          ,Carryover/Other                                             ,           1,          92,              1.1
+      2020,APRIL          ,Crew/Engineer Availability                                  ,          86,          92,             93.5
+      2020,APRIL          ,Human Factor                                                ,           1,          92,              1.1
+      2020,APRIL          ,Mechanical                                                  ,           3,          92,              3.3
+      2020,APRIL          ,Technologies                                                ,           1,          92,              1.1
+      2021,APRIL          ,AMTRAK                                                      ,           3,          24,             12.5
+      2021,APRIL          ,Crew/Engineer Availability                                  ,           2,          24,              8.3
+      2021,APRIL          ,Equipment Availability                                      ,           2,          24,              8.3
+      2021,APRIL          ,Human Factor                                                ,           4,          24,             16.7
+      2017,APRIL          ,Carryover/Other                                             ,          11,          58,               19
+      2017,MAY            ,AMTRAK                                                      ,           2,          38,              5.3
+      2021,MAY            ,Unpreventable                                               ,           4,          17,             23.5
+      2017,MAY            ,Human Factor                                                ,           1,          38,              2.6
+      2017,MAY            ,Infrastructure Engineering                                  ,           1,          38,              2.6
+      2017,MAY            ,Mechanical                                                  ,          18,          38,             47.4
+      2017,MAY            ,Unpreventable                                               ,           7,          38,             18.4
+      2018,MAY            ,AMTRAK                                                      ,           2,          30,              6.7
+      2018,MAY            ,Carryover/Other                                             ,           1,          30,              3.3
+      2018,MAY            ,Crew/Engineer Availability                                  ,          10,          30,             33.3
+      2018,MAY            ,Equipment Availability                                      ,           1,          30,              3.3
+      2018,MAY            ,Human Factor                                                ,           1,          30,              3.3
+      2018,MAY            ,Mechanical                                                  ,          14,          30,             46.7
+      2018,MAY            ,Unpreventable                                               ,           1,          30,              3.3
+      2019,MAY            ,AMTRAK                                                      ,           3,          32,              9.4
+      2019,MAY            ,Crew/Engineer Availability                                  ,          17,          32,             53.1
+      2019,MAY            ,Equipment Availability                                      ,           6,          32,             18.8
+      2019,MAY            ,Human Factor                                                ,           1,          32,              3.1
+      2019,MAY            ,Mechanical                                                  ,           3,          32,              9.4
+      2019,MAY            ,Technologies                                                ,           2,          32,              6.3
+      2020,MAY            ,Crew/Engineer Availability                                  ,         107,         110,             97.3
+      2020,MAY            ,Human Factor                                                ,           1,         110,               .9
+      2020,MAY            ,Technologies                                                ,           1,         110,               .9
+      2020,MAY            ,Unpreventable                                               ,           1,         110,               .9
+      2021,MAY            ,Carryover/Other                                             ,           3,          17,             17.6
+      2021,MAY            ,Infrastructure Engineering                                  ,           1,          17,              5.9
+      2021,MAY            ,Mechanical                                                  ,           9,          17,             52.9
+      2017,MAY            ,Crew/Engineer Availability                                  ,           9,          38,             23.7
+      2017,JUNE           ,AMTRAK                                                      ,           1,          16,              6.3
+      2021,JUNE           ,Unpreventable                                               ,           7,          30,             23.3
+      2017,JUNE           ,Human Factor                                                ,           4,          16,               25
+      2017,JUNE           ,Mechanical                                                  ,           8,          16,               50
+      2017,JUNE           ,Unpreventable                                               ,           1,          16,              6.3
+      2018,JUNE           ,Crew/Engineer Availability                                  ,          13,          26,               50
+      2018,JUNE           ,Human Factor                                                ,           1,          26,              3.8
+      2018,JUNE           ,Infrastructure Engineering                                  ,           2,          26,              7.7
+      2018,JUNE           ,Mechanical                                                  ,          10,          26,             38.5
+      2019,JUNE           ,AMTRAK                                                      ,           5,         128,              3.9
+      2019,JUNE           ,Crew/Engineer Availability                                  ,          95,         128,             74.2
+      2019,JUNE           ,Equipment Availability                                      ,           4,         128,              3.1
+      2019,JUNE           ,Human Factor                                                ,           1,         128,               .8
+      2019,JUNE           ,Mechanical                                                  ,          13,         128,             10.2
+      2019,JUNE           ,Technologies                                                ,           2,         128,              1.6
+      2019,JUNE           ,Unpreventable                                               ,           8,         128,              6.3
+      2020,JUNE           ,Crew/Engineer Availability                                  ,          17,          22,             77.3
+      2020,JUNE           ,Mechanical                                                  ,           1,          22,              4.5
+      2020,JUNE           ,Unpreventable                                               ,           4,          22,             18.2
+      2021,JUNE           ,AMTRAK                                                      ,           1,          30,              3.3
+      2021,JUNE           ,Human Factor                                                ,           1,          30,              3.3
+      2021,JUNE           ,Mechanical                                                  ,          21,          30,               70
+      2017,JUNE           ,Crew/Engineer Availability                                  ,           2,          16,             12.5
+      2017,JULY           ,AMTRAK                                                      ,           8,          71,             11.3
+      2021,JULY           ,Unpreventable                                               ,           5,          32,             15.6
+      2017,JULY           ,Crew/Engineer Availability                                  ,          38,          71,             53.5
+      2017,JULY           ,Human Factor                                                ,           3,          71,              4.2
+      2017,JULY           ,Infrastructure Engineering                                  ,           2,          71,              2.8
+      2017,JULY           ,Mechanical                                                  ,           9,          71,             12.7
+      2017,JULY           ,Unpreventable                                               ,          10,          71,             14.1
+      2018,JULY           ,AMTRAK                                                      ,           2,          38,              5.3
+      2018,JULY           ,Crew/Engineer Availability                                  ,           3,          38,              7.9
+      2018,JULY           ,Equipment Availability                                      ,           6,          38,             15.8
+      2018,JULY           ,Human Factor                                                ,           2,          38,              5.3
+      2018,JULY           ,Infrastructure Engineering                                  ,           2,          38,              5.3
+      2018,JULY           ,Mechanical                                                  ,          11,          38,             28.9
+      2018,JULY           ,Unpreventable                                               ,          12,          38,             31.6
+      2019,JULY           ,Crew/Engineer Availability                                  ,          70,         114,             61.4
+      2019,JULY           ,Equipment Availability                                      ,          14,         114,             12.3
+      2019,JULY           ,Human Factor                                                ,           3,         114,              2.6
+      2019,JULY           ,Mechanical                                                  ,          16,         114,               14
+      2019,JULY           ,Technologies                                                ,           2,         114,              1.8
+      2019,JULY           ,Unpreventable                                               ,           9,         114,              7.9
+      2020,JULY           ,AMTRAK                                                      ,          11,         110,               10
+      2020,JULY           ,Crew/Engineer Availability                                  ,          64,         110,             58.2
+      2020,JULY           ,Equipment Availability                                      ,           3,         110,              2.7
+      2020,JULY           ,Infrastructure Engineering                                  ,          14,         110,             12.7
+      2020,JULY           ,Mechanical                                                  ,          15,         110,             13.6
+      2020,JULY           ,Technologies                                                ,           3,         110,              2.7
+      2021,JULY           ,AMTRAK                                                      ,           3,          32,              9.4
+      2021,JULY           ,Crew/Engineer Availability                                  ,           1,          32,              3.1
+      2021,JULY           ,Equipment Availability                                      ,           2,          32,              6.3
+      2021,JULY           ,Human Factor                                                ,           1,          32,              3.1
+      2021,JULY           ,Infrastructure Engineering                                  ,           4,          32,             12.5
+      2021,JULY           ,Mechanical                                                  ,          16,          32,               50
+      2017,JULY           ,Carryover/Other                                             ,           1,          71,              1.4
+      2017,AUGUST         ,AMTRAK                                                      ,           3,          91,              3.3
+      2017,AUGUST         ,Crew/Engineer Availability                                  ,          68,          91,             74.7
+      2017,AUGUST         ,Human Factor                                                ,           2,          91,              2.2
+      2017,AUGUST         ,Infrastructure Engineering                                  ,           2,          91,              2.2
+      2017,AUGUST         ,Mechanical                                                  ,          16,          91,             17.6
+      2018,AUGUST         ,AMTRAK                                                      ,           2,          68,              2.9
+      2018,AUGUST         ,Crew/Engineer Availability                                  ,          19,          68,             27.9
+      2018,AUGUST         ,Equipment Availability                                      ,          35,          68,             51.5
+      2018,AUGUST         ,Human Factor                                                ,           3,          68,              4.4
+      2018,AUGUST         ,Infrastructure Engineering                                  ,           1,          68,              1.5
+      2018,AUGUST         ,Mechanical                                                  ,           4,          68,              5.9
+      2018,AUGUST         ,Unpreventable                                               ,           4,          68,              5.9
+      2019,AUGUST         ,Crew/Engineer Availability                                  ,          32,          61,             52.5
+      2019,AUGUST         ,Equipment Availability                                      ,           7,          61,             11.5
+      2019,AUGUST         ,Human Factor                                                ,           2,          61,              3.3
+      2019,AUGUST         ,Mechanical                                                  ,           9,          61,             14.8
+      2019,AUGUST         ,Other Railroads                                             ,           1,          61,              1.6
+      2019,AUGUST         ,Technologies                                                ,           3,          61,              4.9
+      2019,AUGUST         ,Unpreventable                                               ,           7,          61,             11.5
+      2020,AUGUST         ,Crew/Engineer Availability                                  ,          89,         265,             33.6
+      2020,AUGUST         ,Equipment Availability                                      ,           1,         265,               .4
+      2020,AUGUST         ,Human Factor                                                ,           2,         265,               .8
+      2020,AUGUST         ,Infrastructure Engineering                                  ,           2,         265,               .8
+      2020,AUGUST         ,Mechanical                                                  ,          12,         265,              4.5
+      2020,AUGUST         ,Technologies                                                ,           2,         265,               .8
+      2020,AUGUST         ,Unpreventable                                               ,         157,         265,             59.2
+      2021,AUGUST         ,AMTRAK                                                      ,           2,          35,              5.7
+      2021,AUGUST         ,Carryover/Other                                             ,           3,          35,              8.6
+      2021,AUGUST         ,Crew/Engineer Availability                                  ,           1,          35,              2.9
+      2021,AUGUST         ,Human Factor                                                ,           3,          35,              8.6
+      2021,AUGUST         ,Infrastructure Engineering                                  ,           1,          35,              2.9
+      2021,AUGUST         ,Mechanical                                                  ,          20,          35,             57.1
+      2021,AUGUST         ,Unpreventable                                               ,           5,          35,             14.3
+      2017,SEPTEMBER      ,AMTRAK                                                      ,          10,          55,             18.2
+      2021,SEPTEMBER      ,Unpreventable                                               ,          14,          54,             25.9
+      2017,SEPTEMBER      ,Equipment Availability                                      ,           1,          55,              1.8
+      2017,SEPTEMBER      ,Human Factor                                                ,           5,          55,              9.1
+      2017,SEPTEMBER      ,Infrastructure Engineering                                  ,           4,          55,              7.3
+      2017,SEPTEMBER      ,Mechanical                                                  ,          11,          55,               20
+      2017,SEPTEMBER      ,Unpreventable                                               ,           5,          55,              9.1
+      2018,SEPTEMBER      ,AMTRAK                                                      ,          17,          75,             22.7
+      2018,SEPTEMBER      ,Carryover/Other                                             ,           2,          75,              2.7
+      2018,SEPTEMBER      ,Crew/Engineer Availability                                  ,           8,          75,             10.7
+      2018,SEPTEMBER      ,Equipment Availability                                      ,          24,          75,               32
+      2018,SEPTEMBER      ,Human Factor                                                ,           2,          75,              2.7
+      2018,SEPTEMBER      ,Infrastructure Engineering                                  ,           1,          75,              1.3
+      2018,SEPTEMBER      ,Mechanical                                                  ,          12,          75,               16
+      2018,SEPTEMBER      ,Unpreventable                                               ,           9,          75,               12
+      2019,SEPTEMBER      ,Carryover/Other                                             ,           2,          45,              4.4
+      2019,SEPTEMBER      ,Crew/Engineer Availability                                  ,          24,          45,             53.3
+      2019,SEPTEMBER      ,Equipment Availability                                      ,           2,          45,              4.4
+      2019,SEPTEMBER      ,Human Factor                                                ,           3,          45,              6.7
+      2019,SEPTEMBER      ,Mechanical                                                  ,          10,          45,             22.2
+      2019,SEPTEMBER      ,Technologies                                                ,           4,          45,              8.9
+      2020,SEPTEMBER      ,AMTRAK                                                      ,           2,          25,                8
+      2020,SEPTEMBER      ,Crew/Engineer Availability                                  ,           8,          25,               32
+      2020,SEPTEMBER      ,Equipment Availability                                      ,           2,          25,                8
+      2020,SEPTEMBER      ,Human Factor                                                ,           1,          25,                4
+      2020,SEPTEMBER      ,Mechanical                                                  ,           7,          25,               28
+      2020,SEPTEMBER      ,Technologies                                                ,           5,          25,               20
+      2021,SEPTEMBER      ,AMTRAK                                                      ,          12,          54,             22.2
+      2021,SEPTEMBER      ,Crew/Engineer Availability                                  ,           2,          54,              3.7
+      2021,SEPTEMBER      ,Human Factor                                                ,           5,          54,              9.3
+      2021,SEPTEMBER      ,Infrastructure Engineering                                  ,           9,          54,             16.7
+      2021,SEPTEMBER      ,Mechanical                                                  ,          12,          54,             22.2
+      2017,SEPTEMBER      ,Crew/Engineer Availability                                  ,          19,          55,             34.5
+      2017,OCTOBER        ,Crew/Engineer Availability                                  ,          22,          35,             62.9
+      2021,OCTOBER        ,Unpreventable                                               ,          40,          69,               58
+      2017,OCTOBER        ,Unpreventable                                               ,           7,          35,               20
+      2018,OCTOBER        ,AMTRAK                                                      ,           7,          64,             10.9
+      2018,OCTOBER        ,Carryover/Other                                             ,           2,          64,              3.1
+      2018,OCTOBER        ,Crew/Engineer Availability                                  ,           9,          64,             14.1
+      2018,OCTOBER        ,Equipment Availability                                      ,          18,          64,             28.1
+      2018,OCTOBER        ,Human Factor                                                ,           2,          64,              3.1
+      2018,OCTOBER        ,Infrastructure Engineering                                  ,           3,          64,              4.7
+      2018,OCTOBER        ,Mechanical                                                  ,           9,          64,             14.1
+      2018,OCTOBER        ,Other                                                       ,           9,          64,             14.1
+      2018,OCTOBER        ,Technologies                                                ,           3,          64,              4.7
+      2018,OCTOBER        ,Unpreventable                                               ,           2,          64,              3.1
+      2019,OCTOBER        ,Carryover/Other                                             ,           1,          49,                2
+      2019,OCTOBER        ,Crew/Engineer Availability                                  ,          24,          49,               49
+      2019,OCTOBER        ,Human Factor                                                ,           6,          49,             12.2
+      2019,OCTOBER        ,Infrastructure Engineering                                  ,           3,          49,              6.1
+      2019,OCTOBER        ,Mechanical                                                  ,          14,          49,             28.6
+      2019,OCTOBER        ,Technologies                                                ,           1,          49,                2
+      2020,OCTOBER        ,AMTRAK                                                      ,           2,          53,              3.8
+      2020,OCTOBER        ,Crew/Engineer Availability                                  ,          11,          53,             20.8
+      2020,OCTOBER        ,Human Factor                                                ,           3,          53,              5.7
+      2020,OCTOBER        ,Mechanical                                                  ,           9,          53,               17
+      2020,OCTOBER        ,Technologies                                                ,           2,          53,              3.8
+      2020,OCTOBER        ,Unpreventable                                               ,          26,          53,             49.1
+      2021,OCTOBER        ,AMTRAK                                                      ,           3,          69,              4.3
+      2021,OCTOBER        ,Crew/Engineer Availability                                  ,           1,          69,              1.4
+      2021,OCTOBER        ,Equipment Availability                                      ,           2,          69,              2.9
+      2021,OCTOBER        ,Human Factor                                                ,           2,          69,              2.9
+      2021,OCTOBER        ,Infrastructure Engineering                                  ,           4,          69,              5.8
+      2021,OCTOBER        ,Mechanical                                                  ,          17,          69,             24.6
+      2017,OCTOBER        ,Mechanical                                                  ,           6,          35,             17.1
+      2017,NOVEMBER       ,AMTRAK                                                      ,           1,          38,              2.6
+      2020,NOVEMBER       ,Technologies                                                ,           3,         176,              1.7
+      2017,NOVEMBER       ,Crew/Engineer Availability                                  ,          10,          38,             26.3
+      2017,NOVEMBER       ,Equipment Availability                                      ,           5,          38,             13.2
+      2017,NOVEMBER       ,Human Factor                                                ,           3,          38,              7.9
+      2017,NOVEMBER       ,Infrastructure Engineering                                  ,           1,          38,              2.6
+      2017,NOVEMBER       ,Mechanical                                                  ,          17,          38,             44.7
+      2018,NOVEMBER       ,AMTRAK                                                      ,          13,         161,              8.1
+      2018,NOVEMBER       ,Carryover/Other                                             ,           5,         161,              3.1
+      2018,NOVEMBER       ,Crew/Engineer Availability                                  ,           6,         161,              3.7
+      2018,NOVEMBER       ,Equipment Availability                                      ,          18,         161,             11.2
+      2018,NOVEMBER       ,Human Factor                                                ,          10,         161,              6.2
+      2018,NOVEMBER       ,Mechanical                                                  ,          10,         161,              6.2
+      2018,NOVEMBER       ,Unpreventable                                               ,          99,         161,             61.5
+      2019,NOVEMBER       ,AMTRAK                                                      ,           4,          32,             12.5
+      2019,NOVEMBER       ,Crew/Engineer Availability                                  ,          19,          32,             59.4
+      2019,NOVEMBER       ,Equipment Availability                                      ,           2,          32,              6.3
+      2019,NOVEMBER       ,Human Factor                                                ,           2,          32,              6.3
+      2019,NOVEMBER       ,Mechanical                                                  ,           4,          32,             12.5
+      2019,NOVEMBER       ,Unpreventable                                               ,           1,          32,              3.1
+      2020,NOVEMBER       ,Crew/Engineer Availability                                  ,          16,         176,              9.1
+      2020,NOVEMBER       ,Human Factor                                                ,           2,         176,              1.1
+      2020,NOVEMBER       ,Mechanical                                                  ,          11,         176,              6.3
+      2020,NOVEMBER       ,Other                                                       ,         142,         176,             80.7
+      2020,NOVEMBER       ,Other Railroads                                             ,           2,         176,              1.1
+      2017,NOVEMBER       ,Carryover/Other                                             ,           1,          38,              2.6
+      2017,DECEMBER       ,Crew/Engineer Availability                                  ,          15,          44,             34.1
+      2020,DECEMBER       ,Unpreventable                                               ,          47,         108,             43.5
+      2017,DECEMBER       ,Human Factor                                                ,           2,          44,              4.5
+      2017,DECEMBER       ,Infrastructure Engineering                                  ,           2,          44,              4.5
+      2017,DECEMBER       ,Mechanical                                                  ,          10,          44,             22.7
+      2017,DECEMBER       ,Unpreventable                                               ,          10,          44,             22.7
+      2018,DECEMBER       ,Crew/Engineer Availability                                  ,          10,          61,             16.4
+      2018,DECEMBER       ,Equipment Availability                                      ,          35,          61,             57.4
+      2018,DECEMBER       ,Human Factor                                                ,           2,          61,              3.3
+      2018,DECEMBER       ,Mechanical                                                  ,          11,          61,               18
+      2018,DECEMBER       ,Unpreventable                                               ,           3,          61,              4.9
+      2019,DECEMBER       ,Crew/Engineer Availability                                  ,          29,          47,             61.7
+      2019,DECEMBER       ,Infrastructure Engineering                                  ,           2,          47,              4.3
+      2019,DECEMBER       ,Mechanical                                                  ,          11,          47,             23.4
+      2019,DECEMBER       ,Technologies                                                ,           4,          47,              8.5
+      2019,DECEMBER       ,Unpreventable                                               ,           1,          47,              2.1
+      2020,DECEMBER       ,AMTRAK                                                      ,           3,         108,              2.8
+      2020,DECEMBER       ,Crew/Engineer Availability                                  ,           9,         108,              8.3
+      2020,DECEMBER       ,Equipment Availability                                      ,          17,         108,             15.7
+      2020,DECEMBER       ,Human Factor                                                ,           2,         108,              1.9
+      2020,DECEMBER       ,Mechanical                                                  ,          25,         108,             23.1
+      2020,DECEMBER       ,Technologies                                                ,           5,         108,              4.6
+      2017,DECEMBER       ,Equipment Availability                                      ,           5,          44,             11.4

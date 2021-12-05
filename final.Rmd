@@ -190,7 +190,9 @@ oneday %>%
     geom_line(aes(x=actual_time)) +
     scale_y_continuous(breaks = oneday$dist.mp, labels = oneday$to, minor_breaks = NULL) +
     scale_x_datetime(date_breaks = "1 hour", labels = date_format("%H:%M")) +
-    labs(x='Time',y='Station (by milepost distance)') +
+    labs(x='Time',y='Station (by milepost distance)',
+         title="Northeast Corridor Line stringline diagram",
+         subtitle="") +
     theme(legend.position='none') +
     facet_grid(rows=vars(direction))
 ```
