@@ -23,6 +23,7 @@
 - Create feature for known bottleneck (interlocking, speed limit)
 - Time lag
 - Period of day
+- Weather
 
 ## Modeling
 
