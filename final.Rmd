@@ -49,6 +49,7 @@ knitr::opts_chunk$set(fig.path = 'figs/',
 ```
 
 ```{r}
+library(caret)
 library(data.table)
 library(gganimate)
 library(hms)
@@ -102,7 +103,7 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
     stop_sequence == 1 & from == 'Trenton' ~ 'eastbound',
     stop_sequence == 1 & from == 'New York Penn Station' ~ 'westbound'
   )) %>% fill(direction) %>% 
-  mutate(station_id_c = case_when(
+  mutate(stop_seq_abs = case_when(
     from == "Trenton" & direction == 'eastbound' ~ 1,
     from == "Hamilton" & direction == 'eastbound' ~ 2,
     from == "Princeton Junction" & direction == 'eastbound' ~ 3,
@@ -146,15 +147,15 @@ necl.id <- necl2019 %>% distinct(train_id,date,direction)
 ```
   
 ```{r schedule deviance: summarise by time period, fig.width=8, fig.height=5}
-p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_sequence) %>%
+p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
-  ggplot(aes(x=stop_sequence, y=avgdelay)) +
+  ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
   geom_line() +
   facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
   ggtitle('Weekday')
-p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_sequence) %>%
+p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
-  ggplot(aes(x=stop_sequence, y=avgdelay)) +
+  ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
   geom_line() +
   facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
   ggtitle('Weekend')
@@ -163,6 +164,7 @@ p1 / p2
 ```
 
 ```{r stringline diagram}
+
 
 
 ```
