@@ -55,6 +55,7 @@ library(gganimate)
 library(hms)
 library(lubridate)
 library(patchwork)
+library(scales)
 library(sf)
 library(tidyverse)
 library(tidytransit)
@@ -163,10 +164,35 @@ p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_seq_abs) %
 p1 / p2
 ```
 
-```{r stringline diagram}
-
-
-
+```{r stringline diagram, fig.width=8, fig.height=4}
+oneday <- necl2019 %>% filter(date %in% slice_sample(.)) %>% 
+  mutate(dist.mp = case_when(
+    to == "Trenton" ~ 58.1,
+    to == "Hamilton" ~ 54.4,
+    to == "Princeton Junction" ~ 48.4,
+    to == "Jersey Avenue" ~ 34.4,
+    to == "New Brunswick" ~ 32.7,
+    to == "Edison" ~ 30.3,
+    to == "Metuchen" ~ 27.1,
+    to == "Metropark" ~ 24.6,
+    to == "Rahway" ~ 20.7,
+    to == "Linden" ~ 18.6,
+    to == "Elizabeth" ~ 15.4,
+    to == "North Elizabeth" ~ 14.4,
+    to == "Newark Airport" ~ 12.6,
+    to == "Newark Penn Station" ~ 10,
+    to == "Secaucus Upper Lvl" ~ 4.9,
+    to == "New York Penn Station" ~ 0,
+  ))
+oneday %>% 
+  ggplot(aes(y=dist.mp,group=train_id,color=direction)) +
+    geom_line(aes(x=scheduled_time),linetype='dashed') +
+    geom_line(aes(x=actual_time)) +
+    scale_y_continuous(breaks = oneday$dist.mp, labels = oneday$to, minor_breaks = NULL) +
+    scale_x_datetime(date_breaks = "1 hour", labels = date_format("%H:%M")) +
+    labs(x='Time',y='Station (by milepost distance)') +
+    theme(legend.position='none') +
+    facet_grid(rows=vars(direction))
 ```
 
 
