@@ -43,6 +43,8 @@ overflow-wrap: break-word;
 }
 </style>
 
+## Setup
+
 ```{r knitr_opts, include = FALSE}
 knitr::opts_chunk$set(fig.path = 'figs/',
                       echo = TRUE, warning = FALSE, message = FALSE, cache.lazy = FALSE)
@@ -73,6 +75,8 @@ int.evening <- interval(as_hms("20:00:01"),as_hms("23:59:59"))
 int.overngt <- interval(as_hms("00:00:00"),as_hms("04:59:59"))
 ```
 
+## Kaggle data wrangling
+
 ```{r intake delay data, echo=FALSE, message=FALSE}
 invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
 invalid$date <- invalid$date %>% str_replace_all("_","-") %>% as.Date()
@@ -92,7 +96,6 @@ amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
 amtk_sf <- gtfs_as_sf(amtk)
 ```
 
-
 ```{r 2019 NEC line delay data}
 necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
   filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
@@ -105,7 +108,7 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
       ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.overngt  ~ "Overnight"
   )) %>% mutate(isWkdy = ifelse(wday(date) %in% c(2,3,4,5,6),TRUE,FALSE)
    ) %>% mutate(direction = case_when(
-    stop_sequence == 1 & from == 'Trenton' ~ 'eastbound',
+    stop_sequence == 1 & from != 'New York Penn Station' ~ 'eastbound',
     stop_sequence == 1 & from == 'New York Penn Station' ~ 'westbound'
   )) %>% fill(direction) %>% 
   mutate(stop_seq_abs = case_when(
@@ -150,7 +153,11 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
 
 necl.id <- necl2019 %>% distinct(train_id,date,direction)
 ```
-  
+
+## Visualization
+
+### Schedule deviance chart, faceted by time/direction of service
+
 ```{r schedule deviance: summarise by time period, fig.width=8, fig.height=5}
 p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
@@ -167,6 +174,8 @@ p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_seq_abs) %
 
 p1 / p2
 ```
+
+### Stringline diagram of one day's service
 
 ```{r stringline diagram, fig.width=8, fig.height=4}
 oneday <- necl2019 %>% filter(date %in% slice_sample(.)) %>% 
@@ -188,6 +197,7 @@ oneday <- necl2019 %>% filter(date %in% slice_sample(.)) %>%
     to == "Secaucus Upper Lvl" ~ 4.9,
     to == "New York Penn Station" ~ 0,
   ))
+
 oneday %>% 
   ggplot(aes(y=dist.mp,group=train_id,color=direction)) +
     geom_line(aes(x=scheduled_time),linetype='dashed') +
@@ -196,12 +206,13 @@ oneday %>%
     scale_x_datetime(date_breaks = "1 hour", labels = date_format("%H:%M")) +
     labs(x='Time',y='Station (by milepost distance)',
          title="Northeast Corridor Line stringline diagram",
-         subtitle="") +
+         subtitle=paste("on sample date",oneday$date,"| Dashed is scheduled time, solid is actual time")) +
     theme(legend.position='none') +
     facet_grid(rows=vars(direction))
 ```
 
 ## Feature engineering
+
 ### Weather
 
 ```{r weather}
@@ -235,7 +246,8 @@ grid.arrange(top = "Weather Data - Newark, NJ - March-October 2019",
 
 ```{r weather join}
 necl2019 <- necl2019 %>%
-  mutate(interval60 = floor_date(scheduled_time, unit = "hour"),
+  mutate(interval15 = floor_date(scheduled_time, unit = "15min"),
+         interval60 = floor_date(scheduled_time, unit = "hour"),
          week = week(scheduled_time),
          dotw = wday(scheduled_time),
          trip_count = 1) %>%
@@ -243,22 +255,35 @@ necl2019 <- necl2019 %>%
   na.omit()
 ```
 
-<<<<<<< HEAD
+### Cancelled trains data
 
-
-=======
 There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html 
-```{r cancel}
-cancel <- read_csv('C:/Users/mnxan/OneDrive/Documents/GitHub/musa508-final/cancel/RAIL_NEC_CANCELLATIONS_DATA.csv')%>%filter(YEAR==2019)
 
+```{r cancelled trains}
+cancel <- read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>%
+  filter(YEAR==2019) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT))
 
-cancel$CANCEL_COUNT <- as.numeric(cancel$CANCEL_COUNT)
-cancel$MONTH <- factor(str_to_sentence(cancel$MONTH), level=month.name)
-
-  
-ggplot(cancel, aes(fill=CATEGORY,y=CANCEL_COUNT, x=MONTH)) + 
+ggplot(cancel, aes(fill=CATEGORY,y=CANCEL_COUNT, x=factor(str_to_sentence(cancel$MONTH), level=month.name))) + 
     geom_bar(position="fill", stat="identity")+
     scale_y_continuous(labels = scales::percent_format())
+
+cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>% 
+  pivot_wider(names_from=CATEGORY,values_from=CANCEL_COUNT)
+
+necl2019 <- necl2019 %>% mutate(MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
+  left_join(cancel,by=('MONTH')) %>% mutate_if(is.numeric,coalesce,0)
 ```
 
->>>>>>> b4167675b97b48c399c9d06586cf7931357a4a24
+## Prepare model
+
+## Regression model training
+
+## Predictions on test data
+
+## Cross-validation
+
+## Conclusion
+
+
+
+
