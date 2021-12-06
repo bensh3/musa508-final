@@ -67,11 +67,11 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 ```
 
 ```{r define time periods}
-int.ampeak <- interval(as_hms("05:00:00"),as_hms("10:00:00"))
+int.ampeak <- interval(as_hms("06:00:00"),as_hms("10:00:00"))
 int.midday <- interval(as_hms("10:00:01"),as_hms("16:00:00"))
-int.pmpeak <- interval(as_hms("16:00:01"),as_hms("20:00:00"))
-int.evening <- interval(as_hms("20:00:01"),as_hms("23:59:59"))
-int.overngt <- interval(as_hms("00:00:00"),as_hms("04:59:59"))
+int.pmpeak <- interval(as_hms("16:00:01"),as_hms("19:00:00"))
+int.evening <- interval(as_hms("19:00:01"),as_hms("23:59:59"))
+int.overngt <- interval(as_hms("00:00:00"),as_hms("05:59:59"))
 ```
 
 ## Kaggle data wrangling
@@ -157,7 +157,7 @@ necl.id <- necl2019 %>% distinct(train_id,date,direction)
 
 ### Schedule deviance chart, faceted by time/direction of service
 
-```{r schedule deviance: summarise by time period, fig.width=8, fig.height=5}
+```{r schedule deviance summarise by time period, fig.width=8, fig.height=5}
 p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
   ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
@@ -360,7 +360,7 @@ week_predictions <-
   delay.Test.weekNest %>% 
     mutate(model = map(.x = data, fit = fit, .f = model_pred)) %>% 
     gather(Regression, Prediction, -data, -week) %>%
-    mutate(Observed = map(data, pull, delay_minutes),
+    mutate(Observed = map(.data, pull, delay_minutes),
            Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
            MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
            sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
