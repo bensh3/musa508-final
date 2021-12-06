@@ -5,10 +5,9 @@ description: |
 date: "2021-10-22"
 author:
   - name: "Benjamin She"
-  - url: https://github.com/bensh3/
-author:
+    url: https://github.com/bensh3/
   - name: "Lechuan Huang"
-  - url: https://github.com/bensh3/
+    url: https://github.com/hlechuan/
 output:
   distill::distill_article:
     toc: true
@@ -246,7 +245,7 @@ grid.arrange(top = "Weather Data - Newark, NJ - March-October 2019",
 
 ```{r weather join}
 necl2019 <- necl2019 %>%
-  mutate(interval15 = floor_date(scheduled_time, unit = "15min"),
+  mutate(interval30 = floor_date(scheduled_time, unit = "30min"),
          interval60 = floor_date(scheduled_time, unit = "hour"),
          week = week(scheduled_time),
          dotw = wday(scheduled_time),
@@ -261,7 +260,7 @@ There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-
 
 ```{r cancelled trains}
 cancel <- read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>%
-  filter(YEAR==2019) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT))
+  filter(YEAR==2019) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
 
 ggplot(cancel, aes(fill=CATEGORY,y=CANCEL_COUNT, x=factor(str_to_sentence(cancel$MONTH), level=month.name))) + 
     geom_bar(position="fill", stat="identity")+
@@ -271,19 +270,121 @@ cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>%
   pivot_wider(names_from=CATEGORY,values_from=CANCEL_COUNT)
 
 necl2019 <- necl2019 %>% mutate(MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
-  left_join(cancel,by=('MONTH')) %>% mutate_if(is.numeric,coalesce,0)
+  left_join(cancel,by=('MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
+  mutate(MONTH = factor(str_to_sentence(MONTH), level=month.name))
 ```
 
 ## Prepare model
 
+```{r time lags}
+necl2019 <- necl2019 %>% 
+  arrange(from,interval30) %>% 
+  mutate(lag30Min = dplyr::lag(delay_minutes,1),
+         lag1Hour = dplyr::lag(delay_minutes,2),
+         lag90Min = dplyr::lag(delay_minutes,3),
+         lag2Hour = dplyr::lag(delay_minutes,4),
+         lag3Hour = dplyr::lag(delay_minutes,6),
+         lag12Hour = dplyr::lag(delay_minutes,24),
+         lag1Day = dplyr::lag(delay_minutes,48)
+  )
+```
+
+```{r evaluate_lags, cache = TRUE, warning = FALSE, message = FALSE}
+as.data.frame(necl2019) %>%
+    group_by(interval30) %>% 
+    summarise_at(vars(starts_with("lag"), "delay_minutes"), mean, na.rm = TRUE) %>%
+    gather(Variable, Value, -interval30, -delay_minutes) %>%
+    mutate(Variable = factor(Variable, levels=c("lag30Min","lag1Hour","lag90Min","lag2Hour",
+                                                "lag3Hour","lag12Hour","lag1Day")))%>%
+    group_by(Variable) %>%  
+    summarize(correlation = round(cor(Value, delay_minutes),2))
+```
+
+
 ## Regression model training
+
+```{r train_test, cache = TRUE}
+delay.Train <- filter(necl2019, month(date) > 4)
+delay.Test <- filter(necl2019, month(date) <= 4)
+```
+
+## Regression formula
+
+```{r}
+fit <- lm(delay_minutes ~ to + period + isWkdy + direction + Precipitation +
+            CANCEL_TOTAL + AMTRAK + `Crew/Engineer Availability` + 
+            `Equipment Availability` + Mechanical +
+            lag30Min + lag1Hour + lag90Min + lag2Hour + lag3Hour + lag12Hour,
+data=delay.Train)
+```
+
+```{r stargazer, results='asis'}
+stargazer::stargazer(fit, type='html', align=TRUE, no.space=TRUE)
+```
+
 
 ## Predictions on test data
 
+```{r nest_data, message=FALSE, warning=FALSE, cache=TRUE}
+delay.Test.weekNest <- 
+  delay.Test %>%
+  nest(-week)
+```
+
+```{r predict_function, cache = TRUE}
+model_pred <- function(dat, fit){
+   pred <- predict(fit, newdata = dat)}
+```
+
+```{r do_predicitons, cache=FALSE}
+week_predictions <- 
+  delay.Test.weekNest %>% 
+    mutate(model = map(.x = data, fit = fit, .f = model_pred)) %>% 
+    gather(Regression, Prediction, -data, -week) %>%
+    mutate(Observed = map(data, pull, delay_minutes),
+           Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
+           MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
+           sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
+
+```
+
+```{r plot_errors_by_model, cache = TRUE}
+week_predictions %>%
+  dplyr::select(week, Regression, MAE) %>%
+  gather(Variable, MAE, -Regression, -week) %>%
+  ggplot(aes(week, MAE)) + 
+    geom_bar(aes(fill = Regression), position = "dodge", stat="identity") +
+    labs(title = "Mean Absolute Errors by week")
+```
+
+```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE, fig.width=5}
+week_predictions %>% 
+    mutate(interval30 = map(data, pull, interval30),
+           from = map(data, pull, from)) %>%
+    dplyr::select(interval30, from, Observed, Prediction, Regression) %>%
+    unnest(cols = c(interval30, from, Observed, Prediction)) %>%
+    gather(Variable, Value, -Regression, -interval30, -from) %>%
+    group_by(Regression, Variable, interval30) %>%
+    summarize(Value = mean(Value)) %>%
+    ggplot(aes(interval30, Value, colour=Variable)) + 
+      geom_line(size = 0.5) + 
+      facet_wrap(~Regression, ncol=1) +
+      labs(title = "Predicted/Observed delay time series", subtitle = "Test set of three weeks",  x = "Hour", y= "Delay (minutes)") +
+    theme(legend.position='bottom')
+```
+
 ## Cross-validation
+
+```{r}
+
+```
+
 
 ## Conclusion
 
+```{r}
+
+```
 
 
 
