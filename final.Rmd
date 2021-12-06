@@ -242,3 +242,17 @@ necl2019 <- necl2019%>%
   na.omit()
 ```
 
+There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html 
+```{r cancel}
+cancel <- read_csv('C:/Users/mnxan/OneDrive/Documents/GitHub/musa508-final/cancel/RAIL_NEC_CANCELLATIONS_DATA.csv')%>%filter(YEAR==2019)
+
+
+cancel$CANCEL_COUNT <- as.numeric(cancel$CANCEL_COUNT)
+cancel$MONTH <- factor(str_to_sentence(cancel$MONTH), level=month.name)
+
+  
+ggplot(cancel, aes(fill=CATEGORY,y=CANCEL_COUNT, x=MONTH)) + 
+    geom_bar(position="fill", stat="identity")+
+    scale_y_continuous(labels = scales::percent_format())
+```
+
