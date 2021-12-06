@@ -177,8 +177,8 @@ p1 / p2
 ### Stringline diagram of one day's service
 
 ```{r stringline diagram, fig.width=8, fig.height=4}
-oneday <- necl2019 %>% filter(date %in% slice_sample(.)) %>% 
-  mutate(dist.mp = case_when(
+necl2019 <- necl2019 %>% 
+  mutate(to.dist.mp = case_when(
     to == "Trenton" ~ 58.1,
     to == "Hamilton" ~ 54.4,
     to == "Princeton Junction" ~ 48.4,
@@ -195,13 +195,32 @@ oneday <- necl2019 %>% filter(date %in% slice_sample(.)) %>%
     to == "Newark Penn Station" ~ 10,
     to == "Secaucus Upper Lvl" ~ 4.9,
     to == "New York Penn Station" ~ 0,
-  ))
+  ),from.dist.mp = case_when(
+    from == "Trenton" ~ 58.1,
+    from == "Hamilton" ~ 54.4,
+    from == "Princeton Junction" ~ 48.4,
+    from == "Jersey Avenue" ~ 34.4,
+    from == "New Brunswick" ~ 32.7,
+    from == "Edison" ~ 30.3,
+    from == "Metuchen" ~ 27.1,
+    from == "Metropark" ~ 24.6,
+    from == "Rahway" ~ 20.7,
+    from == "Linden" ~ 18.6,
+    from == "Elizabeth" ~ 15.4,
+    from == "North Elizabeth" ~ 14.4,
+    from == "Newark Airport" ~ 12.6,
+    from == "Newark Penn Station" ~ 10,
+    from == "Secaucus Upper Lvl" ~ 4.9,
+    from == "New York Penn Station" ~ 0,
+  ),inter.dist.mp = abs(from.dist.mp-to.dist.mp))
+
+oneday <- necl2019 %>% filter(date %in% slice_sample(.))
 
 oneday %>% 
-  ggplot(aes(y=dist.mp,group=train_id,color=direction)) +
+  ggplot(aes(y=to.dist.mp,group=train_id,color=direction)) +
     geom_line(aes(x=scheduled_time),linetype='dashed') +
     geom_line(aes(x=actual_time)) +
-    scale_y_continuous(breaks = oneday$dist.mp, labels = oneday$to, minor_breaks = NULL) +
+    scale_y_continuous(breaks = oneday$to.dist.mp, labels = oneday$to, minor_breaks = NULL) +
     scale_x_datetime(date_breaks = "1 hour", labels = date_format("%H:%M")) +
     labs(x='Time',y='Station (by milepost distance)',
          title="Northeast Corridor Line stringline diagram",
@@ -313,7 +332,7 @@ delay.Test <- filter(necl2019, month(date) <= 4)
 ```{r}
 fit <- lm(delay_minutes ~ to + period + isWkdy + direction + Precipitation +
             CANCEL_TOTAL + AMTRAK + `Crew/Engineer Availability` + 
-            `Equipment Availability` + Mechanical +
+            `Equipment Availability` + Mechanical + inter.dist.mp +
             lag30Min + lag1Hour + lag90Min + lag2Hour + lag3Hour + lag12Hour,
 data=delay.Train)
 ```
@@ -360,23 +379,24 @@ week_predictions %>%
 ```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE, fig.width=5}
 week_predictions %>% 
     mutate(interval30 = map(data, pull, interval30),
-           from = map(data, pull, from)) %>%
-    dplyr::select(interval30, from, Observed, Prediction, Regression) %>%
-    unnest(cols = c(interval30, from, Observed, Prediction)) %>%
-    gather(Variable, Value, -Regression, -interval30, -from) %>%
+           from = map(data, pull, from),
+           direction = map(data,pull,direction)) %>%
+    dplyr::select(interval30, from, direction, Observed, Prediction, Regression) %>%
+    unnest(cols = c(interval30, from, direction, Observed, Prediction)) %>%
+    gather(Variable, Value, -Regression, -interval30, -from, -direction) %>%
     group_by(Regression, Variable, interval30) %>%
     summarize(Value = mean(Value)) %>%
     ggplot(aes(interval30, Value, colour=Variable)) + 
       geom_line(size = 0.5) + 
       facet_wrap(~Regression, ncol=1) +
-      labs(title = "Predicted/Observed delay time series", subtitle = "Test set of three weeks",  x = "Hour", y= "Delay (minutes)") +
+      labs(title = "Predicted/Observed delay time series",
+           subtitle = "Test set of three weeks",  x = "Hour", y= "Delay (minutes)") +
     theme(legend.position='bottom')
 ```
 
 ## Cross-validation
 
 ```{r}
-
 ```
 
 
