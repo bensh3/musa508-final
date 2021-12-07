@@ -281,12 +281,19 @@ There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-
 cancel <- read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>%
   filter(YEAR==2019) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
 
-ggplot(cancel, aes(fill=CATEGORY,y=CANCEL_COUNT, x=factor(str_to_sentence(cancel$MONTH), level=month.name))) + 
-    geom_bar(position="fill", stat="identity")+
-    scale_y_continuous(labels = scales::percent_format())
+ggplot(cancel, aes(fill=reorder(CATEGORY,-CANCEL_COUNT),
+                   x=factor(str_to_sentence(cancel$MONTH),level=month.name),
+                   y=CANCEL_COUNT,)) +
+  geom_bar(position="stack",stat="identity") +
+  scale_fill_discrete(name='Category') +
+  labs(title='NJT cancellations by month and reason', subtitle="Line:",
+       x='Month', y='Count of cancellations')
 
 cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>% 
-  pivot_wider(names_from=CATEGORY,values_from=CANCEL_COUNT)
+  pivot_wider(names_from=CATEGORY,values_from=CANCEL_COUNT) %>%
+  rename(crewAvail = `Crew/Engineer Availability`,
+         equipAvail = `Equipment Availability`,
+         humanFactor = `Human Factor`)
 
 necl2019 <- necl2019 %>% mutate(MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
   left_join(cancel,by=('MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
@@ -323,18 +330,20 @@ as.data.frame(necl2019) %>%
 ## Regression model training
 
 ```{r train_test, cache = TRUE}
-delay.Train <- filter(necl2019, month(date) > 4)
-delay.Test <- filter(necl2019, month(date) <= 4)
+necl2019 <- necl2019 %>% mutate(logDelay = log(delay_minutes + 0.1))
+
+delay.Train <- filter(necl2019, month(date) > 3)
+delay.Test <- filter(necl2019, month(date) <= 3)
 ```
 
 ## Regression formula
 
 ```{r}
-fit <- lm(delay_minutes ~ to + period + isWkdy + direction + Precipitation +
-            CANCEL_TOTAL + AMTRAK + `Crew/Engineer Availability` + 
-            `Equipment Availability` + Mechanical + inter.dist.mp +
+fit <- lm(logDelay ~ to + period + isWkdy + direction + Precipitation +
+            CANCEL_TOTAL + AMTRAK + `crewAvail` + 
+            `equipAvail` + Mechanical + inter.dist.mp +
             lag30Min + lag1Hour + lag90Min + lag2Hour + lag3Hour + lag12Hour,
-data=delay.Train)
+          data=delay.Train)
 ```
 
 ```{r stargazer, results='asis'}
@@ -355,12 +364,12 @@ model_pred <- function(dat, fit){
    pred <- predict(fit, newdata = dat)}
 ```
 
-```{r do_predicitons, cache=FALSE}
+```{r make_predictions, cache=FALSE}
 week_predictions <- 
   delay.Test.weekNest %>% 
     mutate(model = map(.x = data, fit = fit, .f = model_pred)) %>% 
     gather(Regression, Prediction, -data, -week) %>%
-    mutate(Observed = map(data, pull, delay_minutes),
+    mutate(Observed = map(data, pull, logDelay),
            Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
            MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
            sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
@@ -376,7 +385,7 @@ week_predictions %>%
     labs(title = "Mean Absolute Errors by week")
 ```
 
-```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE, fig.width=5}
+```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE}
 week_predictions %>% 
     mutate(interval30 = map(data, pull, interval30),
            from = map(data, pull, from),
@@ -384,21 +393,73 @@ week_predictions %>%
     dplyr::select(interval30, from, direction, Observed, Prediction, Regression) %>%
     unnest(cols = c(interval30, from, direction, Observed, Prediction)) %>%
     gather(Variable, Value, -Regression, -interval30, -from, -direction) %>%
-    group_by(Regression, Variable, interval30) %>%
+    group_by(Regression, Variable, interval30, direction) %>%
     summarize(Value = mean(Value)) %>%
-    ggplot(aes(interval30, Value, colour=Variable)) + 
+    ggplot(aes(interval30, exp(Value)-0.1, colour=Variable)) + 
       geom_line(size = 0.5) + 
-      facet_wrap(~Regression, ncol=1) +
+      facet_wrap(~direction, ncol=1) +
       labs(title = "Predicted/Observed delay time series",
-           subtitle = "Test set of three weeks",  x = "Hour", y= "Delay (minutes)") +
-    theme(legend.position='bottom')
+           subtitle = "Test set of three weeks",  x = "Datetime", y= "Delay (minutes)") +
+    theme(legend.position='bottom') +
+    coord_cartesian(ylim=c(0,15))
 ```
 
 ## Cross-validation
 
-```{r}
+```{r, echo=FALSE}
+crossValidate <- function(dataset, id, dependentVariable, indVariables) {
+  
+  allPredictions <- data.frame()
+  cvID_list <- unique(dataset[[id]])
+  
+  for (i in cvID_list) {
+    
+    thisFold <- i
+    
+    fold.train <- filter(dataset, dataset[[id]] != thisFold) %>% as.data.frame() %>% 
+      dplyr::select(all_of(id), all_of(indVariables), all_of(dependentVariable))
+    fold.test  <- filter(dataset, dataset[[id]] == thisFold) %>% as.data.frame() %>% 
+      dplyr::select(all_of(id), all_of(indVariables), all_of(dependentVariable))
+    
+    regression <-
+      glm(paste0(dependentVariable,"~ ."), family = "gaussian",
+          data = dplyr::select(fold.train,-id))
+    
+    thisPrediction <- 
+      mutate(fold.test, Prediction = predict(regression, fold.test, type = "response"))
+    
+    allPredictions <-
+      rbind(allPredictions, thisPrediction)
+    
+  }
+  return(allPredictions)
+}
 ```
 
+
+```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:17,sep=fixed(" + "))
+
+reg.cv.time <- crossValidate(
+  dataset = delay.Test %>% mutate(day.hour = paste(dotw,hour(interval60))),
+  id = "day.hour",
+  dependentVariable = "logDelay",
+  indVariables = reg.vars) %>%
+  dplyr::select(day.hour, logDelay, Prediction)
+```
+
+```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+reg.cv.time %>%
+  group_by(day.hour) %>% 
+  summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
+            MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup() %>%
+  ggplot() + 
+    geom_histogram(aes(MAE), bins = 30) +
+    geom_vline(xintercept = 0) + 
+    labs(title="Cross-validation: mean average error", subtitle = "k-fold cross validation: Day of Week + Hour",
+         x="Mean Absolute Error", y="Count")
+```
 
 ## Conclusion
 
