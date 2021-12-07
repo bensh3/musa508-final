@@ -96,7 +96,7 @@ amtk_sf <- gtfs_as_sf(amtk)
 ```
 
 ```{r 2019 NEC line delay data}
-necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
+necl <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_with('2019'))) %>% 
   filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
   arrange(date,train_id,stop_sequence) %>% 
   filter(complete.cases(.)) %>% mutate(period = case_when(
@@ -147,10 +147,10 @@ necl2019 <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
 ```
 
 ```{r get unique train IDs per day}
-# necl.oneday <- necl2019 %>% 
+# necl.oneday <- necl %>% 
 #   filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
 
-necl.id <- necl2019 %>% distinct(train_id,date,direction)
+necl.id <- necl %>% distinct(train_id,date,direction)
 ```
 
 ## Visualization
@@ -158,13 +158,13 @@ necl.id <- necl2019 %>% distinct(train_id,date,direction)
 ### Schedule deviance chart, faceted by time/direction of service
 
 ```{r schedule deviance summarise by time period, fig.width=8, fig.height=5}
-p1 <- necl2019 %>% filter(isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
+p1 <- necl %>% filter(isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
   ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
   geom_line() +
   facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
   ggtitle('Weekday')
-p2 <- necl2019 %>% filter(!isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
+p2 <- necl %>% filter(!isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
   summarise(avgdelay = mean(delay_minutes)) %>% 
   ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
   geom_line() +
@@ -176,8 +176,8 @@ p1 / p2
 
 ### Stringline diagram of one day's service
 
-```{r stringline diagram, fig.width=8, fig.height=4}
-necl2019 <- necl2019 %>% 
+```{r set mileposts}
+necl <- necl %>% 
   mutate(to.dist.mp = case_when(
     to == "Trenton" ~ 58.1,
     to == "Hamilton" ~ 54.4,
@@ -213,8 +213,11 @@ necl2019 <- necl2019 %>%
     from == "Secaucus Upper Lvl" ~ 4.9,
     from == "New York Penn Station" ~ 0,
   ),inter.dist.mp = abs(from.dist.mp-to.dist.mp))
+```
 
-oneday <- necl2019 %>% filter(date %in% slice_sample(.))
+```{r stringline diagram, fig.width=8, fig.height=4}
+oneday <- necl %>% filter(date %in% slice_sample(.)) %>%
+  mutate(to.dist.mp=to.dist.mp*-1)
 
 oneday %>% 
   ggplot(aes(y=to.dist.mp,group=train_id,color=direction)) +
@@ -222,7 +225,7 @@ oneday %>%
     geom_line(aes(x=actual_time)) +
     scale_y_continuous(breaks = oneday$to.dist.mp, labels = oneday$to, minor_breaks = NULL) +
     scale_x_datetime(date_breaks = "1 hour", labels = date_format("%H:%M")) +
-    labs(x='Time',y='Station (by milepost distance)',
+    labs(x='',y='Station (by milepost distance)',
          title="Northeast Corridor Line stringline diagram",
          subtitle=paste("on sample date",oneday$date,"| Dashed is scheduled time, solid is actual time")) +
     theme(legend.position='none') +
@@ -235,7 +238,7 @@ oneday %>%
 
 ```{r weather}
 weather.DataNWK <- 
-  riem_measures(station = "EWR", date_start = "2019-03-01", date_end = "2019-10-31")
+  riem_measures(station = "EWR", date_start = "2018-03-01", date_end = "2019-12-31")
 
 weather.PanelNWK <-  
   weather.DataNWK %>%
@@ -263,7 +266,7 @@ grid.arrange(top = "Weather Data - Newark, NJ - March-October 2019",
 ```
 
 ```{r weather join}
-necl2019 <- necl2019 %>%
+necl <- necl %>%
   mutate(interval30 = floor_date(scheduled_time, unit = "30min"),
          interval60 = floor_date(scheduled_time, unit = "hour"),
          week = week(scheduled_time),
@@ -279,7 +282,7 @@ There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-
 
 ```{r cancelled trains}
 cancel <- read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>%
-  filter(YEAR==2019) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
+  filter(YEAR %in% c(2018,2019)) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
 
 ggplot(cancel, aes(fill=reorder(CATEGORY,-CANCEL_COUNT),
                    x=factor(str_to_sentence(cancel$MONTH),level=month.name),
@@ -287,7 +290,8 @@ ggplot(cancel, aes(fill=reorder(CATEGORY,-CANCEL_COUNT),
   geom_bar(position="stack",stat="identity") +
   scale_fill_discrete(name='Category') +
   labs(title='NJT cancellations by month and reason', subtitle="Line:",
-       x='Month', y='Count of cancellations')
+       x='Month', y='Count of cancellations') +
+  facet_grid(rows=vars(YEAR))
 
 cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>% 
   pivot_wider(names_from=CATEGORY,values_from=CANCEL_COUNT) %>%
@@ -295,15 +299,15 @@ cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>%
          equipAvail = `Equipment Availability`,
          humanFactor = `Human Factor`)
 
-necl2019 <- necl2019 %>% mutate(MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
-  left_join(cancel,by=('MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
+necl <- necl %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
+  left_join(cancel,by=c('YEAR','MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
   mutate(MONTH = factor(str_to_sentence(MONTH), level=month.name))
 ```
 
 ## Prepare model
 
 ```{r time lags}
-necl2019 <- necl2019 %>% 
+necl <- necl %>% 
   arrange(from,interval30) %>% 
   mutate(lag30Min = dplyr::lag(delay_minutes,1),
          lag1Hour = dplyr::lag(delay_minutes,2),
@@ -316,7 +320,7 @@ necl2019 <- necl2019 %>%
 ```
 
 ```{r evaluate_lags, cache = TRUE, warning = FALSE, message = FALSE}
-as.data.frame(necl2019) %>%
+as.data.frame(necl) %>%
     group_by(interval30) %>% 
     summarise_at(vars(starts_with("lag"), "delay_minutes"), mean, na.rm = TRUE) %>%
     gather(Variable, Value, -interval30, -delay_minutes) %>%
@@ -330,10 +334,10 @@ as.data.frame(necl2019) %>%
 ## Regression model training
 
 ```{r train_test, cache = TRUE}
-necl2019 <- necl2019 %>% mutate(logDelay = log(delay_minutes + 0.1))
+necl <- necl %>% mutate(logDelay = log(delay_minutes + 0.1))
 
-delay.Train <- filter(necl2019, month(date) > 3)
-delay.Test <- filter(necl2019, month(date) <= 3)
+delay.Train <- filter(necl, date < ymd(20190701))
+delay.Test <- filter(necl, date >= ymd(20190701))
 ```
 
 ## Regression formula
@@ -435,7 +439,6 @@ crossValidate <- function(dataset, id, dependentVariable, indVariables) {
   return(allPredictions)
 }
 ```
-
 
 ```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:17,sep=fixed(" + "))
