@@ -88,7 +88,7 @@ names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement 
 ```
 
 ```{r intake GTFS data}
-njt <- read_gtfs("gtfs_njt.zip")
+njt <- read_gtfs("gtfs_njt.zip") %>% filter_feed_by_stops(stop_ids=c('148'))
 njt_sf <- gtfs_as_sf(njt)
 
 amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
@@ -99,12 +99,13 @@ amtk_sf <- gtfs_as_sf(amtk)
 necl <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_with('2019'))) %>% 
   filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
   arrange(date,train_id,stop_sequence) %>% 
-  filter(complete.cases(.)) %>% mutate(period = case_when(
-      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.ampeak  ~ "AM peak",
-      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.midday  ~ "Midday",
-      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.pmpeak  ~ "PM peak",
-      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.evening  ~ "Evening",
-      ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.overngt  ~ "Overnight"
+  filter(complete.cases(.)) %>%
+  mutate(period = case_when(
+    ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.ampeak  ~ "AM peak",
+    ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.midday  ~ "Midday",
+    ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.pmpeak  ~ "PM peak",
+    ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.evening  ~ "Evening",
+    ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.overngt  ~ "Overnight"
   )) %>% mutate(isWkdy = ifelse(wday(date) %in% c(2,3,4,5,6),TRUE,FALSE)
    ) %>% mutate(direction = case_when(
     stop_sequence == 1 & from != 'New York Penn Station' ~ 'eastbound',
@@ -152,6 +153,17 @@ necl <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_wit
 
 necl.id <- necl %>% distinct(train_id,date,direction)
 ```
+
+```{r}
+first <- necl %>% group_by(date,train_id) %>% arrange(stop_sequence) %>% filter(row_number()==1) %>% rename('first_time' = 'actual_time') %>% select(date,train_id,first_time)
+
+last <- necl %>% group_by(date,train_id) %>% arrange(-stop_sequence) %>% filter(row_number()==1) %>% rename('last_time' = 'actual_time') %>% select(date,train_id,last_time)
+
+invalid2 <- first %>% left_join(last,by=c('date','train_id')) %>% filter(first_time == last_time)
+
+necl <- necl %>% anti_join(invalid2,by=c('date','train_id'))
+```
+
 
 ## Visualization
 
@@ -215,7 +227,7 @@ necl <- necl %>%
   ),inter.dist.mp = abs(from.dist.mp-to.dist.mp))
 ```
 
-```{r stringline diagram, fig.width=8, fig.height=4}
+```{r stringline diagram, fig.width=8, fig.height=6}
 oneday <- necl %>% filter(date %in% slice_sample(.)) %>%
   mutate(to.dist.mp=to.dist.mp*-1)
 
@@ -285,7 +297,7 @@ cancel <- read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>%
   filter(YEAR %in% c(2018,2019)) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
 
 ggplot(cancel, aes(fill=reorder(CATEGORY,-CANCEL_COUNT),
-                   x=factor(str_to_sentence(cancel$MONTH),level=month.name),
+                   x=factor(str_sub(str_to_sentence(cancel$MONTH),1,3),level=month.abb),
                    y=CANCEL_COUNT,)) +
   geom_bar(position="stack",stat="identity") +
   scale_fill_discrete(name='Category') +
@@ -301,7 +313,14 @@ cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>%
 
 necl <- necl %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
   left_join(cancel,by=c('YEAR','MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
-  mutate(MONTH = factor(str_to_sentence(MONTH), level=month.name))
+  mutate(MONTH = factor(str_to_sentence(MONTH), level=month.name),
+         to_id = as.character(to_id),from_id = as.character(from_id))
+```
+
+### Add geography
+
+```{r}
+necl <- necl %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf()
 ```
 
 ## Prepare model
@@ -374,7 +393,7 @@ week_predictions <-
     mutate(model = map(.x = data, fit = fit, .f = model_pred)) %>% 
     gather(Regression, Prediction, -data, -week) %>%
     mutate(Observed = map(data, pull, logDelay),
-           Absolute_Error = map2(Observed, Prediction,  ~ abs(.x - .y)),
+           Absolute_Error = map2(Observed, Prediction, ~ abs(.x - .y)),
            MAE = map_dbl(Absolute_Error, mean, na.rm = TRUE),
            sd_AE = map_dbl(Absolute_Error, sd, na.rm = TRUE))
 
@@ -449,6 +468,13 @@ reg.cv.time <- crossValidate(
   dependentVariable = "logDelay",
   indVariables = reg.vars) %>%
   dplyr::select(day.hour, logDelay, Prediction)
+
+reg.cv.station <- crossValidate(
+  dataset = delay.Test,
+  id = "to",
+  dependentVariable = "logDelay",
+  indVariables = reg.vars) %>%
+  dplyr::select(to, logDelay, Prediction)
 ```
 
 ```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
@@ -461,6 +487,19 @@ reg.cv.time %>%
     geom_histogram(aes(MAE), bins = 30) +
     geom_vline(xintercept = 0) + 
     labs(title="Cross-validation: mean average error", subtitle = "k-fold cross validation: Day of Week + Hour",
+         x="Mean Absolute Error", y="Count")
+```
+
+```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+reg.cv.station %>%
+  group_by(to) %>% 
+  summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
+            MAE = mean(abs(Mean_Error), na.rm = T)) %>%
+  ungroup() %>%
+  ggplot() + 
+    geom_histogram(aes(MAE), bins = 30) +
+    geom_vline(xintercept = 0) + 
+    labs(title="Cross-validation: mean average error", subtitle = "k-fold cross validation: station",
          x="Mean Absolute Error", y="Count")
 ```
 
