@@ -1,5 +1,7 @@
 # Northeast Corridor delay methodology
 
+## Presentation
+https://youtu.be/FoiRxNST2fg
 ## Data collection
 
 - Kaggle
