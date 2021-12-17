@@ -6,8 +6,10 @@ date: "2021-12-17"
 author:
   - name: "Benjamin She"
     url: https://github.com/bensh3/
+    affiliation: Limited Express LLC
   - name: "Lechuan Huang"
     url: https://github.com/hlechuan/
+    affiliation: Limited Express LLC
 output:
   distill::distill_article:
     toc: true
@@ -44,13 +46,18 @@ overflow-wrap: break-word;
 
 ## Background
 
-In this markdown, we are going to introduce a new feature called NJT onTrack that can be directly integrated in the New Jersey Transit app and website. 
+![New Jersey Transit Northeast Corridor Line train at New Brunswick](njt_nbk.jpg)
 
-This feature predicts the train delays of NJT operations that can be used by both professional and non-professional to understand the operation status, reliability of service, and work on improving the infrastructure and services of NJT network better.
+
+The lifeblood of any large metropolitan city is in its transit, but it's a dual-edged sword: not properly anticipating and handling train delays could be disastrous for the region economically and socially. For New Jersey, the densest state in the United States, having a statewide regional rail network is a particularly difficult affair. Developed over 190 years through multiple private railroad companies, the New Jersey Transit network today is still quite vulnerable to delays and outright cancellations, causing widespread frustration and disinterest among the public for transit. Especially as the pandemic has suggested the long-term viability of remote/hybrid work, people more than ever have the option to skip riding the train against their will, and transit agencies must must take the initiative through opportunities like the Building Back Better infrastructure bill to get the ridership they cannot now take for granted.
+
+![Delay headlines](njdelays.png)
+
+At the same time, there has been a movement among more transit agencies to expose more of their collected data to the public, whether pre-existing or newly captured. Analysts from inside and outside the agency can develop new rider metrics and analytics based on this historical performance, and eventually develop visualizations and dashboards both for their own purposes and as tools for savvy commuters.
+
+In this report, our firm Limited Express was retained by NJ Transit to develop a proof-of-concept model, called NJT onTrack, that serves this dual purpose for the Rail Operations division. The eventual aim is to develop both a feature metric integrated in the existing NJ Transit app to predict and display potential delays before they occur, and build an analytical dashboard that displays historical train performance, service levels, and delay indicators. Using a linear regression model with temporal-spatial lag predictors, it is hoped that as delay predictions improve, they can eventually feed back into schedule planning and capital infrastructure investment to reduce delay hotspots altogether, both in time (time of day, day of week) and in space (particular bottlenecks or slow zones).
 
 ## Setup
-
-Loading packages.
 
 ```{r knitr_opts, include = FALSE}
 knitr::opts_chunk$set(fig.path = 'figs/',
@@ -77,7 +84,7 @@ source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-L
 `%ni%` <- Negate(`%in%`)
 ```
 
-```{r define time periods}
+```{r define time periods, warning=FALSE}
 int.ampeak <- interval(as_hms("06:00:00"),as_hms("10:00:00"))
 int.midday <- interval(as_hms("10:00:01"),as_hms("16:00:00"))
 int.pmpeak <- interval(as_hms("16:00:01"),as_hms("19:00:00"))
@@ -87,13 +94,13 @@ int.overngt <- interval(as_hms("00:00:00"),as_hms("05:59:59"))
 
 ## Kaggle data wrangling
 
-Loading data and cleaning. We load the NJ Transit operation information in 2019 that includes every train and every stop.
+Here we load and clean the initial delay data. Uploaded to Kaggle in 2020, it is a snapshot of the real-time departure times of nearly every NJ Transit train at each station from March 2018 to May 2020, compared to their scheduled departure time. 
 
 ```{r intake delay data, echo=FALSE, message=FALSE}
 invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
 invalid$date <- invalid$date %>% str_replace_all("_","-") %>% as.Date()
 
-delay_files <- list.files("delay",pattern="^20")
+delay_files <- list.files("delay",pattern="^2019")
 delay <- lapply(paste0('delay/',delay_files),read_csv) %>% 
   map(anti_join,invalid,by=c("date","train_id"))
 
@@ -105,15 +112,12 @@ We also load the GTFS data for verifying purposes.
 ```{r intake GTFS data}
 njt <- read_gtfs("gtfs_njt.zip")
 njt_sf <- gtfs_as_sf(njt)
-
-amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
-amtk_sf <- gtfs_as_sf(amtk)
 ```
 
 Here we parse the time data.
 
 ```{r 2019 NEC line delay data}
-njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_with('2019'))) %>% 
+njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
   filter(type == 'NJ Transit') %>% 
   arrange(date,line,train_id,stop_sequence) %>% 
   filter(complete.cases(.)) %>%
@@ -128,14 +132,8 @@ njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts
     stop_sequence == 1 & from %ni% c('New York Penn Station','Hoboken','Atlantic City Rail Terminal') ~ 'eastbound',
     stop_sequence == 1 & from %in% c('New York Penn Station','Hoboken','Atlantic City Rail Terminal') ~ 'westbound'
   )) %>% fill(direction) %>% 
-   mutate(stop_seq_abs = as.numeric(factor(stop_sequence)))
-```
-
-```{r get unique train IDs per day}
-# necl.oneday <- necl %>% 
-#   filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
-
-njtlines.id <- njtlines %>% distinct(train_id,date,direction)
+  mutate(stop_seq_abs = as.numeric(factor(stop_sequence))) %>% 
+  mutate(isLate = if_else(delay_minutes >= 6,1,0))
 ```
 
 ```{r filter for more runs that did not capture time change}
@@ -149,32 +147,48 @@ njtlines <- njtlines %>% anti_join(invalid2,by=c('date','train_id'))
 ```
 
 
-## Visualization
+## Exploratory analysis and visualization
+
+```{r}
+
+```
 
 ### Schedule deviance chart, faceted by time/direction of service
 
 Here we separated the trains based on the period of the day, and draw diagrams show the average delay through the entire journey of that period.
 
-```{r schedule deviance summarise by time period, fig.width=8, fig.height=5}
-deviance <- function(Line) {
-  p1 <- njtlines %>% filter(isWkdy & line == Line) %>% group_by(direction,period,stop_seq_abs) %>%
+```{r schedule deviance summarise by time period, fig.width=10, fig.height=6}
+  p1 <- njtlines %>% filter(isWkdy & line != "Atl. City Line") %>% group_by(line,direction,period,stop_seq_abs) %>%
     summarise(avgdelay = mean(delay_minutes)) %>% 
-    ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
+    ggplot(aes(x=stop_seq_abs, y=avgdelay, color=line)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-    ggtitle('Weekday')
-  p2 <- njtlines %>% filter(!isWkdy & line == Line) %>% group_by(direction,period,stop_seq_abs) %>%
-    summarise(avgdelay = mean(delay_minutes)) %>% 
-    ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
+    ggtitle('Weekday') + theme(legend.position='none')
+  p2 <- njtlines %>% filter(!isWkdy & line != "Atl. City Line") %>% group_by(line,direction,period,stop_seq_abs) %>%
+    summarise(avgdelacy = mean(delay_minutes)) %>% 
+    ggplot(aes(x=stop_seq_abs, y=avgdelay, color=line)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-    ggtitle('Weekend')
+    ggtitle('Weekend') + theme(legend.position='bottom')
   
   p1 / p2
-}
+```
 
-deviance('Northeast Corrdr')
-deviance('Raritan Valley')
+```{r schedule deviance ACRL, fig.width=10, fig.height=6}
+  p1 <- njtlines %>% filter(isWkdy & line == "Atl. City Line") %>% group_by(direction,period,stop_seq_abs) %>%
+    summarise(avgdelay = mean(delay_minutes)) %>% 
+    ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
+    geom_line() +
+    facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
+    ggtitle('Weekday') + theme(legend.position='none')
+  p2 <- njtlines %>% filter(!isWkdy & line == "Atl. City Line") %>% group_by(direction,period,stop_seq_abs) %>%
+    summarise(avgdelay = mean(delay_minutes)) %>% 
+    ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
+    geom_line() +
+    facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
+    ggtitle('Weekend') + theme(legend.position='bottom')
+  
+  p1 / p2
 ```
 
 ### Line/station shapefiles
@@ -189,7 +203,7 @@ njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0b
 
 ### Stringline diagram of one day's service
 
-Here we introduce the Stringline. It is a visualized tool for rail dispatchers to quickly view train schedule and operation on a certain line. The x-axis is time and y are the stations spaced by their actual distance. In this Northeast Corridor stringline on a random day, we can see that westbound trains are consistently more late than eastbound ones.
+Here we introduce the Stringline diagram. Used by transit agencies throughout the world, it is a visualized tool for rail dispatchers to quickly view train schedule and operation on a certain line. The x-axis is time and y are the stations spaced by their actual distance. In this Northeast Corridor stringline on a random day, we can see that westbound trains are consistently more late than eastbound ones, a predictor that is of particular importance.
 
 ```{r set inter-station distance}
 milepost <- read_csv("milepost.csv")
@@ -348,7 +362,7 @@ Split our data into training and testing sets.
 
 ```{r train_test, cache = TRUE}
 njtlines <- njtlines %>% mutate(logDelay = log(delay_minutes + 0.1)) %>%
-  filter(line %in% c('Northeast Corrdr','No Jersey Coast','Raritan Valley'))
+  filter(line %in% c('Northeast Corrdr','No Jersey Coast'))
 
 delay.Train <- filter(njtlines, date < ymd(20190701))
 delay.Test <- filter(njtlines, date >= ymd(20190701))
@@ -458,7 +472,7 @@ crossValidate <- function(dataset, id, dependentVariable, indVariables) {
 ```
 
 ```{r cv2, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
-reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:17,sep=fixed(" + "))
+reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:21,sep=fixed(" + "))
 
 reg.cv.time <- crossValidate(
   dataset = delay.Test %>% mutate(day.hour = paste(dotw,hour(interval60))),
