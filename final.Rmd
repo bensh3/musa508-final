@@ -42,6 +42,10 @@ overflow-wrap: break-word;
 }
 </style>
 
+## Background
+
+
+
 ## Setup
 
 ```{r knitr_opts, include = FALSE}
@@ -55,15 +59,18 @@ library(data.table)
 library(gganimate)
 library(gridExtra)
 library(hms)
+library(leaflet)
 library(lubridate)
 library(patchwork)
 library(riem)
 library(scales)
 library(sf)
+library(lwgeom)
 library(tidyverse)
 library(tidytransit)
 
 source("https://raw.githubusercontent.com/urbanSpatial/Public-Policy-Analytics-Landing/master/functions.r")
+`%ni%` <- Negate(`%in%`)
 ```
 
 ```{r define time periods}
@@ -87,8 +94,10 @@ delay <- lapply(paste0('delay/',delay_files),read_csv) %>%
 names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement = "")
 ```
 
+
+
 ```{r intake GTFS data}
-njt <- read_gtfs("gtfs_njt.zip") %>% filter_feed_by_stops(stop_ids=c('148'))
+njt <- read_gtfs("gtfs_njt.zip")
 njt_sf <- gtfs_as_sf(njt)
 
 amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
@@ -96,9 +105,9 @@ amtk_sf <- gtfs_as_sf(amtk)
 ```
 
 ```{r 2019 NEC line delay data}
-necl <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_with('2019'))) %>% 
-  filter(type == 'NJ Transit' & line == 'Northeast Corrdr') %>% 
-  arrange(date,train_id,stop_sequence) %>% 
+njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_with('2019'))) %>% 
+  filter(type == 'NJ Transit') %>% 
+  arrange(date,line,train_id,stop_sequence) %>% 
   filter(complete.cases(.)) %>%
   mutate(period = case_when(
     ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.ampeak  ~ "AM peak",
@@ -108,60 +117,27 @@ necl <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_wit
     ymd_hms(paste0('1970-01-01',str_sub(scheduled_time,12))) %within% int.overngt  ~ "Overnight"
   )) %>% mutate(isWkdy = ifelse(wday(date) %in% c(2,3,4,5,6),TRUE,FALSE)
    ) %>% mutate(direction = case_when(
-    stop_sequence == 1 & from != 'New York Penn Station' ~ 'eastbound',
-    stop_sequence == 1 & from == 'New York Penn Station' ~ 'westbound'
+    stop_sequence == 1 & from %ni% c('New York Penn Station','Hoboken','Atlantic City Rail Terminal') ~ 'eastbound',
+    stop_sequence == 1 & from %in% c('New York Penn Station','Hoboken','Atlantic City Rail Terminal') ~ 'westbound'
   )) %>% fill(direction) %>% 
-  mutate(stop_seq_abs = case_when(
-    from == "Trenton" & direction == 'eastbound' ~ 1,
-    from == "Hamilton" & direction == 'eastbound' ~ 2,
-    from == "Princeton Junction" & direction == 'eastbound' ~ 3,
-    from == "Jersey Avenue" & direction == 'eastbound' ~ 4,
-    from == "New Brunswick" & direction == 'eastbound' ~ 5,
-    from == "Edison" & direction == 'eastbound' ~ 6,
-    from == "Metuchen" & direction == 'eastbound' ~ 7,
-    from == "Metropark" & direction == 'eastbound' ~ 8,
-    from == "Rahway" & direction == 'eastbound' ~ 9,
-    from == "Linden" & direction == 'eastbound' ~ 10,
-    from == "Elizabeth" & direction == 'eastbound' ~ 11,
-    from == "North Elizabeth" & direction == 'eastbound' ~ 12,
-    from == "Newark Airport" & direction == 'eastbound' ~ 13,
-    from == "Newark Penn Station" & direction == 'eastbound' ~ 14,
-    from == "Secaucus Upper Lvl" & direction == 'eastbound' ~ 15,
-    from == "New York Penn Station" & direction == 'eastbound' ~ 16,
-    from == "Trenton" & direction == 'westbound' ~ 16,
-    from == "Hamilton" & direction == 'westbound' ~ 15,
-    from == "Princeton Junction" & direction == 'westbound' ~ 14,
-    from == "Jersey Avenue" & direction == 'westbound' ~ 13,
-    from == "New Brunswick" & direction == 'westbound' ~ 12,
-    from == "Edison" & direction == 'westbound' ~ 11,
-    from == "Metuchen" & direction == 'westbound' ~ 10,
-    from == "Metropark" & direction == 'westbound' ~ 9,
-    from == "Rahway" & direction == 'westbound' ~ 8,
-    from == "Linden" & direction == 'westbound' ~ 7,
-    from == "Elizabeth" & direction == 'westbound' ~ 6,
-    from == "North Elizabeth" & direction == 'westbound' ~ 5,
-    from == "Newark Airport" & direction == 'westbound' ~ 4,
-    from == "Newark Penn Station" & direction == 'westbound' ~ 3,
-    from == "Secaucus Upper Lvl" & direction == 'westbound' ~ 2,
-    from == "New York Penn Station" & direction == 'westbound' ~ 1,
-  )) 
+   mutate(stop_seq_abs = as.numeric(factor(stop_sequence)))
 ```
 
 ```{r get unique train IDs per day}
 # necl.oneday <- necl %>% 
 #   filter(date %in% seq(as.Date("2019/06/18"), by = "day", length.out = 1))
 
-necl.id <- necl %>% distinct(train_id,date,direction)
+njtlines.id <- njtlines %>% distinct(train_id,date,direction)
 ```
 
-```{r}
-first <- necl %>% group_by(date,train_id) %>% arrange(stop_sequence) %>% filter(row_number()==1) %>% rename('first_time' = 'actual_time') %>% select(date,train_id,first_time)
+```{r filter for more runs that did not capture time change}
+first <- njtlines %>% group_by(date,train_id) %>% arrange(stop_sequence) %>% filter(row_number()==1) %>% rename('first_time' = 'actual_time') %>% select(date,train_id,first_time)
 
-last <- necl %>% group_by(date,train_id) %>% arrange(-stop_sequence) %>% filter(row_number()==1) %>% rename('last_time' = 'actual_time') %>% select(date,train_id,last_time)
+last <- njtlines %>% group_by(date,train_id) %>% arrange(-stop_sequence) %>% filter(row_number()==1) %>% rename('last_time' = 'actual_time') %>% select(date,train_id,last_time)
 
 invalid2 <- first %>% left_join(last,by=c('date','train_id')) %>% filter(first_time == last_time)
 
-necl <- necl %>% anti_join(invalid2,by=c('date','train_id'))
+njtlines <- njtlines %>% anti_join(invalid2,by=c('date','train_id'))
 ```
 
 
@@ -170,71 +146,52 @@ necl <- necl %>% anti_join(invalid2,by=c('date','train_id'))
 ### Schedule deviance chart, faceted by time/direction of service
 
 ```{r schedule deviance summarise by time period, fig.width=8, fig.height=5}
-p1 <- necl %>% filter(isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
-  summarise(avgdelay = mean(delay_minutes)) %>% 
-  ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
-  geom_line() +
-  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-  ggtitle('Weekday')
-p2 <- necl %>% filter(!isWkdy) %>% group_by(direction,period,stop_seq_abs) %>%
-  summarise(avgdelay = mean(delay_minutes)) %>% 
-  ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
-  geom_line() +
-  facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-  ggtitle('Weekend')
+deviance <- function(Line) {
+  p1 <- njtlines %>% filter(isWkdy & line == Line) %>% group_by(direction,period,stop_seq_abs) %>%
+    summarise(avgdelay = mean(delay_minutes)) %>% 
+    ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
+    geom_line() +
+    facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
+    ggtitle('Weekday')
+  p2 <- njtlines %>% filter(!isWkdy & line == Line) %>% group_by(direction,period,stop_seq_abs) %>%
+    summarise(avgdelay = mean(delay_minutes)) %>% 
+    ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
+    geom_line() +
+    facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
+    ggtitle('Weekend')
+  
+  p1 / p2
+}
 
-p1 / p2
+deviance('Northeast Corrdr')
+deviance('Raritan Valley')
 ```
+
+### Line/station shapefiles
+```{r}
+njgin.line <- st_read("https://opendata.arcgis.com/datasets/e6701817be974795aecc7f7a8cc42f79_0.geojson")
+njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0beff00600ee930f6_0.geojson")
+```
+
 
 ### Stringline diagram of one day's service
 
-```{r set mileposts}
-necl <- necl %>% 
-  mutate(to.dist.mp = case_when(
-    to == "Trenton" ~ 58.1,
-    to == "Hamilton" ~ 54.4,
-    to == "Princeton Junction" ~ 48.4,
-    to == "Jersey Avenue" ~ 34.4,
-    to == "New Brunswick" ~ 32.7,
-    to == "Edison" ~ 30.3,
-    to == "Metuchen" ~ 27.1,
-    to == "Metropark" ~ 24.6,
-    to == "Rahway" ~ 20.7,
-    to == "Linden" ~ 18.6,
-    to == "Elizabeth" ~ 15.4,
-    to == "North Elizabeth" ~ 14.4,
-    to == "Newark Airport" ~ 12.6,
-    to == "Newark Penn Station" ~ 10,
-    to == "Secaucus Upper Lvl" ~ 4.9,
-    to == "New York Penn Station" ~ 0,
-  ),from.dist.mp = case_when(
-    from == "Trenton" ~ 58.1,
-    from == "Hamilton" ~ 54.4,
-    from == "Princeton Junction" ~ 48.4,
-    from == "Jersey Avenue" ~ 34.4,
-    from == "New Brunswick" ~ 32.7,
-    from == "Edison" ~ 30.3,
-    from == "Metuchen" ~ 27.1,
-    from == "Metropark" ~ 24.6,
-    from == "Rahway" ~ 20.7,
-    from == "Linden" ~ 18.6,
-    from == "Elizabeth" ~ 15.4,
-    from == "North Elizabeth" ~ 14.4,
-    from == "Newark Airport" ~ 12.6,
-    from == "Newark Penn Station" ~ 10,
-    from == "Secaucus Upper Lvl" ~ 4.9,
-    from == "New York Penn Station" ~ 0,
-  ),inter.dist.mp = abs(from.dist.mp-to.dist.mp))
+```{r set inter-station distance}
+milepost <- read_csv("milepost.csv")
+njtlines <- njtlines %>% 
+  left_join(milepost %>% rename(to.dist.mp = dist_mp),by=c("to"="station")) %>% 
+  left_join(milepost %>% rename(from.dist.mp = dist_mp),by=c("from"="station")) %>% 
+  mutate(inter.dist.mp=abs(from.dist.mp-to.dist.mp))
 ```
 
-```{r stringline diagram, fig.width=8, fig.height=6}
-oneday <- necl %>% filter(date %in% slice_sample(.)) %>%
+```{r stringline diagram, fig.width=6, fig.height=4}
+oneday <- njtlines %>% filter(line == "Northeast Corrdr" & date %in% slice_sample(.)) %>%
   mutate(to.dist.mp=to.dist.mp*-1)
 
 oneday %>% 
   ggplot(aes(y=to.dist.mp,group=train_id,color=direction)) +
-    geom_line(aes(x=scheduled_time),linetype='dashed') +
-    geom_line(aes(x=actual_time)) +
+    geom_line(aes(x=scheduled_time),linetype='dashed',lwd=.50) +
+    geom_line(aes(x=actual_time),lwd=.50) +
     scale_y_continuous(breaks = oneday$to.dist.mp, labels = oneday$to, minor_breaks = NULL) +
     scale_x_datetime(date_breaks = "1 hour", labels = date_format("%H:%M")) +
     labs(x='',y='Station (by milepost distance)',
@@ -278,7 +235,7 @@ grid.arrange(top = "Weather Data - Newark, NJ - March-October 2019",
 ```
 
 ```{r weather join}
-necl <- necl %>%
+njtlines <- njtlines %>%
   mutate(interval30 = floor_date(scheduled_time, unit = "30min"),
          interval60 = floor_date(scheduled_time, unit = "hour"),
          week = week(scheduled_time),
@@ -293,15 +250,32 @@ necl <- necl %>%
 There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html 
 
 ```{r cancelled trains}
-cancel <- read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>%
-  filter(YEAR %in% c(2018,2019)) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
+cancel <- bind_rows(
+  read_csv("cancel/RAIL_ACRL_CANCELLATIONS_DATA.csv") %>% mutate(line="Atl. City Line"),
+  read_csv("cancel/RAIL_BNTN_CANCELLATIONS_DATA.csv") %>% mutate(line="Bergen Co. Line"),
+  read_csv("cancel/RAIL_MNBN_CANCELLATIONS_DATA.csv") %>% mutate(line="Montclair-Boonton"),
+  read_csv("cancel/RAIL_MNE_CANCELLATIONS_DATA.csv") %>% mutate(line="Morristown Line"),
+  read_csv("cancel/RAIL_NEC_CANCELLATIONS_DATA.csv") %>% mutate(line="Northeast Corrdr"),
+  read_csv("cancel/RAIL_NJCL_CANCELLATIONS_DATA.csv") %>% mutate(line="No Jersey Coast"),
+  read_csv("cancel/RAIL_PASC_CANCELLATIONS_DATA.csv") %>% mutate(line="Pascack Valley"),
+  read_csv("cancel/RAIL_RARV_CANCELLATIONS_DATA.csv") %>% mutate(line="Raritan Valley"),
+  ) %>% filter(YEAR %in% c(2018,2019)) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
 
-ggplot(cancel, aes(fill=reorder(CATEGORY,-CANCEL_COUNT),
-                   x=factor(str_sub(str_to_sentence(cancel$MONTH),1,3),level=month.abb),
-                   y=CANCEL_COUNT,)) +
-  geom_bar(position="stack",stat="identity") +
+delayByMonth <- njtlines %>% 
+  group_by(line,year(date),month(date,abbr=T)) %>% summarise(meanDelay = mean(delay_minutes)) %>%
+  rename('YEAR'='year(date)','MONTH'='month(date, abbr = T)')
+
+ggplot() +
+  geom_bar(data=filter(cancel,line=="Northeast Corrdr"), 
+           aes(fill=reorder(CATEGORY,-CANCEL_COUNT),
+               x=factor(str_sub(str_to_sentence(filter(cancel,line=="Northeast Corrdr")$MONTH),1,3),level=month.abb),
+               y=CANCEL_COUNT),
+           position="stack",stat="identity") +
+  geom_point(data=filter(delayByMonth,line=="Northeast Corrdr"), aes(x=MONTH,y=meanDelay*10)) +
   scale_fill_discrete(name='Category') +
-  labs(title='NJT cancellations by month and reason', subtitle="Line:",
+  scale_y_continuous(sec.axis=sec_axis(trans=~./10,name='Average delay (min)')) +
+  labs(title='NJT cancellations by month and reason',
+       subtitle=paste("Line: ",filter(cancel,line=="Northeast Corrdr")$line),
        x='Month', y='Count of cancellations') +
   facet_grid(rows=vars(YEAR))
 
@@ -311,8 +285,8 @@ cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>%
          equipAvail = `Equipment Availability`,
          humanFactor = `Human Factor`)
 
-necl <- necl %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
-  left_join(cancel,by=c('YEAR','MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
+njtlines <- njtlines %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
+  left_join(cancel,by=c('line','YEAR','MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
   mutate(MONTH = factor(str_to_sentence(MONTH), level=month.name),
          to_id = as.character(to_id),from_id = as.character(from_id))
 ```
@@ -320,13 +294,13 @@ necl <- necl %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper(month(d
 ### Add geography
 
 ```{r}
-necl <- necl %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf()
+njtlines <- njtlines %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf()
 ```
 
 ## Prepare model
 
 ```{r time lags}
-necl <- necl %>% 
+njtlines <- njtlines %>% 
   arrange(from,interval30) %>% 
   mutate(lag30Min = dplyr::lag(delay_minutes,1),
          lag1Hour = dplyr::lag(delay_minutes,2),
@@ -339,7 +313,7 @@ necl <- necl %>%
 ```
 
 ```{r evaluate_lags, cache = TRUE, warning = FALSE, message = FALSE}
-as.data.frame(necl) %>%
+as.data.frame(njtlines) %>%
     group_by(interval30) %>% 
     summarise_at(vars(starts_with("lag"), "delay_minutes"), mean, na.rm = TRUE) %>%
     gather(Variable, Value, -interval30, -delay_minutes) %>%
@@ -353,16 +327,17 @@ as.data.frame(necl) %>%
 ## Regression model training
 
 ```{r train_test, cache = TRUE}
-necl <- necl %>% mutate(logDelay = log(delay_minutes + 0.1))
+njtlines <- njtlines %>% mutate(logDelay = log(delay_minutes + 0.1)) %>%
+  filter(line %in% c('Northeast Corrdr','No Jersey Coast','Raritan Valley'))
 
-delay.Train <- filter(necl, date < ymd(20190701))
-delay.Test <- filter(necl, date >= ymd(20190701))
+delay.Train <- filter(njtlines, date < ymd(20190701))
+delay.Test <- filter(njtlines, date >= ymd(20190701))
 ```
 
 ## Regression formula
 
 ```{r}
-fit <- lm(logDelay ~ to + period + isWkdy + direction + Precipitation +
+fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Precipitation +
             CANCEL_TOTAL + AMTRAK + `crewAvail` + 
             `equipAvail` + Mechanical + inter.dist.mp +
             lag30Min + lag1Hour + lag90Min + lag2Hour + lag3Hour + lag12Hour,
@@ -405,7 +380,7 @@ week_predictions %>%
   gather(Variable, MAE, -Regression, -week) %>%
   ggplot(aes(week, MAE)) + 
     geom_bar(aes(fill = Regression), position = "dodge", stat="identity") +
-    labs(title = "Mean Absolute Errors by week")
+    labs(title = "Mean Absolute Errors by week") + theme(legend.position='none')
 ```
 
 ```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE}
@@ -495,12 +470,10 @@ reg.cv.station %>%
   group_by(to) %>% 
   summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
             MAE = mean(abs(Mean_Error), na.rm = T)) %>%
-  ungroup() %>%
-  ggplot() + 
-    geom_histogram(aes(MAE), bins = 30) +
-    geom_vline(xintercept = 0) + 
-    labs(title="Cross-validation: mean average error", subtitle = "k-fold cross validation: station",
-         x="Mean Absolute Error", y="Count")
+  ungroup() %>% left_join(njtlines %>% filter(date %in% slice_sample(.)) %>% distinct(to,to_id),by='to') %>%
+  left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf() %>% 
+  ggplot() +
+  geom_sf(aes(color=MAE,size=MAE))
 ```
 
 ## Conclusion
@@ -508,6 +481,3 @@ reg.cv.station %>%
 ```{r}
 
 ```
-
-
-
