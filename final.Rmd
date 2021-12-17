@@ -2,7 +2,7 @@
 title: "MUSA 508 Final"
 description: |
   Analyzing delays on New Jersey Transit & Amtrak
-date: "2021-10-22"
+date: "2021-12-17"
 author:
   - name: "Benjamin She"
     url: https://github.com/bensh3/
@@ -44,9 +44,13 @@ overflow-wrap: break-word;
 
 ## Background
 
+In this markdown, we are going to introduce a new feature called NJT onTrack that can be directly integrated in the New Jersey Transit app and website. 
 
+This feature predicts the train delays of NJT operations that can be used by both professional and non-professional to understand the operation status, reliability of service, and work on improving the infrastructure and services of NJT network better.
 
 ## Setup
+
+Loading packages.
 
 ```{r knitr_opts, include = FALSE}
 knitr::opts_chunk$set(fig.path = 'figs/',
@@ -83,6 +87,8 @@ int.overngt <- interval(as_hms("00:00:00"),as_hms("05:59:59"))
 
 ## Kaggle data wrangling
 
+Loading data and cleaning. We load the NJ Transit operation information in 2019 that includes every train and every stop.
+
 ```{r intake delay data, echo=FALSE, message=FALSE}
 invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
 invalid$date <- invalid$date %>% str_replace_all("_","-") %>% as.Date()
@@ -94,7 +100,7 @@ delay <- lapply(paste0('delay/',delay_files),read_csv) %>%
 names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement = "")
 ```
 
-
+We also load the GTFS data for verifying purposes.
 
 ```{r intake GTFS data}
 njt <- read_gtfs("gtfs_njt.zip")
@@ -103,6 +109,8 @@ njt_sf <- gtfs_as_sf(njt)
 amtk <- read_gtfs("gtfs_amtk.zip") %>% filter_feed_by_stops(stop_ids=c('NWK'))
 amtk_sf <- gtfs_as_sf(amtk)
 ```
+
+Here we parse the time data.
 
 ```{r 2019 NEC line delay data}
 njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2018') | starts_with('2019'))) %>% 
@@ -145,6 +153,8 @@ njtlines <- njtlines %>% anti_join(invalid2,by=c('date','train_id'))
 
 ### Schedule deviance chart, faceted by time/direction of service
 
+Here we separated the trains based on the period of the day, and draw diagrams show the average delay through the entire journey of that period.
+
 ```{r schedule deviance summarise by time period, fig.width=8, fig.height=5}
 deviance <- function(Line) {
   p1 <- njtlines %>% filter(isWkdy & line == Line) %>% group_by(direction,period,stop_seq_abs) %>%
@@ -168,6 +178,9 @@ deviance('Raritan Valley')
 ```
 
 ### Line/station shapefiles
+
+We also loaded the station data with geometry.
+
 ```{r}
 njgin.line <- st_read("https://opendata.arcgis.com/datasets/e6701817be974795aecc7f7a8cc42f79_0.geojson")
 njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0beff00600ee930f6_0.geojson")
@@ -175,6 +188,8 @@ njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0b
 
 
 ### Stringline diagram of one day's service
+
+Here we introduce the Stringline. It is a visualized tool for rail dispatchers to quickly view train schedule and operation on a certain line. The x-axis is time and y are the stations spaced by their actual distance. In this Northeast Corridor stringline on a random day, we can see that westbound trains are consistently more late than eastbound ones.
 
 ```{r set inter-station distance}
 milepost <- read_csv("milepost.csv")
@@ -204,6 +219,8 @@ oneday %>%
 ## Feature engineering
 
 ### Weather
+
+Weather has impacts on trains running significantly late. However, the weathers that has the most impact on rail operations is not precipitation, but wind speed, as the graph on the right one shows. The stronger wind is, there are more severe delays are observed.
 
 ```{r weather}
 weather.DataNWK <- 
@@ -247,7 +264,9 @@ njtlines <- njtlines %>%
 
 ### Cancelled trains data
 
-There is a labor activities in June 2019. https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html 
+One open data set from NJT is particularly valuable: cancellations by month categorized by reason. This is a direct test of the theory that knock-on disruptions to one train can propagate into other trains close in time. 
+
+We also found something interesting completely by accident: a spike of train cancellations in June 2019 is due to [labor disputes](https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html), that resulted in a local peak for average train delay. 
 
 ```{r cancelled trains}
 cancel <- bind_rows(
@@ -297,7 +316,9 @@ njtlines <- njtlines %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper
 njtlines <- njtlines %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf()
 ```
 
-## Prepare model
+## Regression model training
+
+Add time lag into our models.
 
 ```{r time lags}
 njtlines <- njtlines %>% 
@@ -323,8 +344,7 @@ as.data.frame(njtlines) %>%
     summarize(correlation = round(cor(Value, delay_minutes),2))
 ```
 
-
-## Regression model training
+Split our data into training and testing sets.
 
 ```{r train_test, cache = TRUE}
 njtlines <- njtlines %>% mutate(logDelay = log(delay_minutes + 0.1)) %>%
@@ -334,7 +354,7 @@ delay.Train <- filter(njtlines, date < ymd(20190701))
 delay.Test <- filter(njtlines, date >= ymd(20190701))
 ```
 
-## Regression formula
+For our model, we select predictors like station segments, period of the day, whether it's weekday, direction, precipitation, cancel information, and time-lag.
 
 ```{r}
 fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Precipitation +
@@ -344,12 +364,15 @@ fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Precipitation +
           data=delay.Train)
 ```
 
+Based on the model, here is the result of our predictions by station:
+
 ```{r stargazer, results='asis'}
 stargazer::stargazer(fit, type='html', align=TRUE, no.space=TRUE)
 ```
 
+### Predictions on test data
 
-## Predictions on test data
+Our model results are promising, with the best predictive power being the model including the time lags. The mean absolute error for the test set by week is around 1.2 minutes, but cross-validated by hour of week, the distribution peaks at 0.1 minutes. 
 
 ```{r nest_data, message=FALSE, warning=FALSE, cache=TRUE}
 delay.Test.weekNest <- 
@@ -404,7 +427,7 @@ week_predictions %>%
 
 ## Cross-validation
 
-```{r, echo=FALSE}
+```{r cv1, echo=FALSE}
 crossValidate <- function(dataset, id, dependentVariable, indVariables) {
   
   allPredictions <- data.frame()
@@ -434,7 +457,7 @@ crossValidate <- function(dataset, id, dependentVariable, indVariables) {
 }
 ```
 
-```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+```{r cv2, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:17,sep=fixed(" + "))
 
 reg.cv.time <- crossValidate(
@@ -465,7 +488,7 @@ reg.cv.time %>%
          x="Mean Absolute Error", y="Count")
 ```
 
-```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+```{r cv3, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.cv.station %>%
   group_by(to) %>% 
   summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
@@ -478,6 +501,6 @@ reg.cv.station %>%
 
 ## Conclusion
 
-```{r}
+More work needs to be done in predicting large delays of 15 minutes and more better.
 
-```
+However, train delays are difficult to predict. It has less external, social factors but more hardcore engineering. We can point out certain factors relatively easily, whether because of bottlenecks on physical trackage; but not being able to to predict Amtrak dispatchers that actually control the traffic, and other incidents like mechanical issues, passenger-related delays. More data about the rolling stocks may help us to understand delays related to mechanical issues. 
