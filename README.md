@@ -30,6 +30,6 @@ https://youtu.be/FoiRxNST2fg
 
 ## User Interface
 
-![arch.diagram](https://github.com/bensh3/musa508-final/blob/main/figs/Presentation1.jpg)
+![arch.diagram](https://github.com/bensh3/musa508-final/blob/main/figs/User_interface.jpg)
 
 This is the user interface we recommend: the left is for normal commuters, we just add a delay prediction based on our model posted 2 hours before departure on the existing NJT APP. But for interest group, we are going to have a PC-based dashboard that include a interactive stringline, train’s current and historical operation status. The Service Recommendation section below includes our model results.
