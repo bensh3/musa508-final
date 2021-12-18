@@ -46,12 +46,11 @@ overflow-wrap: break-word;
 
 ## Background
 
-![New Jersey Transit Northeast Corridor Line train at New Brunswick](njt_nbk.jpg)
-
+![New Jersey Transit Northeast Corridor Line train at New Brunswick](imgs/njt_nbk.jpg)
 
 The lifeblood of any large metropolitan city is in its transit, but it's a dual-edged sword: not properly anticipating and handling train delays could be disastrous for the region economically and socially. For New Jersey, the densest state in the United States, having a statewide regional rail network is a particularly difficult affair. Developed over 190 years through multiple private railroad companies, the New Jersey Transit network today is still quite vulnerable to delays and outright cancellations, causing widespread frustration and disinterest among the public for transit. Especially as the pandemic has suggested the long-term viability of remote/hybrid work, people more than ever have the option to skip riding the train against their will, and transit agencies must must take the initiative through opportunities like the Building Back Better infrastructure bill to get the ridership they cannot now take for granted.
 
-![Delay headlines](njdelays.png)
+![Delay headlines](imgs/njdelays.png)
 
 At the same time, there has been a movement among more transit agencies to expose more of their collected data to the public, whether pre-existing or newly captured. Analysts from inside and outside the agency can develop new rider metrics and analytics based on this historical performance, and eventually develop visualizations and dashboards both for their own purposes and as tools for savvy commuters.
 
@@ -95,7 +94,7 @@ int.overngt <- interval(as_hms("00:00:00"),as_hms("05:59:59"))
 
 ## Kaggle data wrangling
 
-Here we load and clean the initial delay data. Uploaded to Kaggle in 2020, it is a snapshot of the real-time departure times of nearly every NJ Transit train at each station from March 2018 to May 2020, compared to their scheduled departure time. 
+Here we load and clean the initial delay data. Uploaded to Kaggle in 2020, it is a snapshot of the real-time departure times of nearly every NJ Transit train at each station from March 2018 to May 2020, compared to their scheduled departure time. For analysis purposes, it was decided to restrict the analysis timeframe to 2019 only, as data from 2018 was found to be relatively spotty, and 2020's data factors were of course marred by the pandemic
 
 ```{r intake delay data, echo=FALSE, message=FALSE}
 invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
@@ -126,6 +125,7 @@ Here we begin to wrangle the delay data into a single dataset. A number of tasks
 ```{r 2019 NEC line delay data}
 njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
   filter(type == 'NJ Transit') %>% 
+  filter(line %in% c('Northeast Corrdr','No Jersey Coast','Atl. City Line')) %>% 
   arrange(date,line,train_id,stop_sequence) %>% 
   filter(complete.cases(.)) %>%
   mutate(period = case_when(
@@ -140,7 +140,7 @@ njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
     stop_sequence == 1 & from %in% c('New York Penn Station','Hoboken','Atlantic City Rail Terminal') ~ 'westbound'
   )) %>% fill(direction) %>% 
   mutate(stop_seq_abs = as.numeric(factor(stop_sequence))) %>% 
-  mutate(isLate = if_else(delay_minutes >= 6,1,0))
+  mutate(isLate = if_else(delay_minutes >= 6,TRUE,FALSE))
 ```
 
 We must also filter out faulty train runs that did not appear to record or change their timepoint when going from first to last station.
@@ -155,6 +155,12 @@ invalid2 <- first %>% left_join(last,by=c('date','train_id')) %>% filter(first_t
 njtlines <- njtlines %>% anti_join(invalid2,by=c('date','train_id')) %>% filter(delay_minutes <= 240)
 ```
 
+The last variable we can derive from existing data is the lagged delay experienced at each train's previous station. This station-based lag is an approximation of the "spatial lag" found in other purely spatial-based analyses.
+
+```{r}
+njtlines <- njtlines %>% group_by(date,train_id) %>% mutate(lagStation = dplyr::lag(delay_minutes,n=1,default=0))
+```
+
 
 ## Exploratory analysis and visualization
 
@@ -162,13 +168,13 @@ We begin by displaying a simple histogram of the percentage of trains that are c
 
 ```{r}
 njtlines %>% group_by(line,week(date)) %>%
-  summarise(pctLate = sum(isLate==1)/sum(isLate %in% c(0,1))) %>% 
+  summarise(pctLate = sum(isLate)/sum(isLate %in% c(TRUE,FALSE))) %>% 
   ggplot(aes(pctLate)) + geom_histogram() + facet_wrap(vars(line))
 ```
 
 ### Schedule deviance chart, faceted by time/direction of service
 
-Here we separated the trains based on the period of the day, and draw diagrams show the average delay through the entire journey of that period. Some signifiant time-space outliers in delays begin to appear, such as the Raritan Valley Line on westbound weekend overnights, which indicate that there is some underlying static pattern, such as maintenance or tight scheduling, that is causing consistent delays.
+Here we separated the trains based on the period of the day, and draw diagrams show the average delay by station sequence through the entire journey of that period. Some signifiant time-space outliers in delays begin to appear, such as the Raritan Valley Line on westbound weekend overnights, which indicate that there is some underlying static pattern, such as maintenance or tight scheduling, that is causing consistent delays.
 
 ```{r schedule deviance summarise by time period, fig.width=10, fig.height=6}
   p1 <- njtlines %>% filter(isWkdy & line != "Atl. City Line") %>% group_by(line,direction,period,stop_seq_abs) %>%
@@ -176,13 +182,13 @@ Here we separated the trains based on the period of the day, and draw diagrams s
     ggplot(aes(x=stop_seq_abs, y=avgdelay, color=line)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-    ggtitle('Weekday') + theme(legend.position='none')
+    ggtitle('Weekday') + labs(x="Station sequence",y="Average delay") + theme(legend.position='none')
   p2 <- njtlines %>% filter(!isWkdy & line != "Atl. City Line") %>% group_by(line,direction,period,stop_seq_abs) %>%
     summarise(avgdelay = mean(delay_minutes)) %>% 
     ggplot(aes(x=stop_seq_abs, y=avgdelay, color=line)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-    ggtitle('Weekend') + theme(legend.position='bottom')
+    ggtitle('Weekend') + labs(x="Station sequence",y="Average delay") + theme(legend.position='bottom')
   
   p1 / p2
 ```
@@ -195,24 +201,15 @@ Compared to the other lines, we can see that the Atlantic City line has consider
     ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-    ggtitle('Weekday') + theme(legend.position='none')
+    ggtitle('Weekday') + labs(x="Station sequence",y="Average delay") + theme(legend.position='none')
   p2 <- njtlines %>% filter(!isWkdy & line == "Atl. City Line") %>% group_by(direction,period,stop_seq_abs) %>%
     summarise(avgdelay = mean(delay_minutes)) %>% 
     ggplot(aes(x=stop_seq_abs, y=avgdelay)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
-    ggtitle('Weekend') + theme(legend.position='bottom')
+    ggtitle('Weekend') + labs(x="Station sequence",y="Average delay") + theme(legend.position='bottom')
   
   p1 / p2
-```
-
-### Line/station shapefiles
-
-We also loaded the station data with geometry.
-
-```{r}
-njgin.line <- st_read("https://opendata.arcgis.com/datasets/e6701817be974795aecc7f7a8cc42f79_0.geojson")
-njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0beff00600ee930f6_0.geojson")
 ```
 
 
@@ -231,7 +228,7 @@ njtlines <- njtlines %>%
 ```
 
 ```{r stringline diagram, fig.width=6, fig.height=4}
-oneday <- njtlines %>% filter(line == "Northeast Corrdr" & date %in% slice_sample(.)) %>%
+oneday <- njtlines %>% ungroup() %>% filter(line == "Northeast Corrdr" & date %in% slice_sample(.)) %>%
   mutate(to.dist.mp=to.dist.mp*-1)
 
 oneday %>% 
@@ -271,7 +268,7 @@ weather.PanelNWK <-
             Wind_Speed = max(sknt)) %>%
   mutate(Temperature = ifelse(Temperature == 0, 42, Temperature))
 
-grid.arrange(top = "Weather Data - Newark, NJ - March-October 2019",
+grid.arrange(top = "Weather Data - Newark, NJ - January-December 2019",
              ggplot(weather.PanelNWK, aes(interval60,Temperature)) + geom_line() + 
                labs(title="Temperature", x="Hour", y="Temperature"),
              ggplot(weather.PanelNWK, aes(interval60,Precipitation)) + geom_line() + 
@@ -309,7 +306,7 @@ cancel <- bind_rows(
   read_csv("cancel/RAIL_NJCL_CANCELLATIONS_DATA.csv") %>% mutate(line="No Jersey Coast"),
   read_csv("cancel/RAIL_PASC_CANCELLATIONS_DATA.csv") %>% mutate(line="Pascack Valley"),
   read_csv("cancel/RAIL_RARV_CANCELLATIONS_DATA.csv") %>% mutate(line="Raritan Valley"),
-  ) %>% filter(YEAR %in% c(2018,2019)) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
+  ) %>% filter(YEAR %in% c(2019)) %>% mutate(CANCEL_COUNT = as.numeric(CANCEL_COUNT),CANCEL_TOTAL = as.numeric(CANCEL_TOTAL))
 
 delayByMonth <- njtlines %>% 
   group_by(line,year(date),month(date,abbr=T)) %>% summarise(meanDelay = mean(delay_minutes)) %>%
@@ -342,16 +339,28 @@ njtlines <- njtlines %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper
          to_id = as.character(to_id),from_id = as.character(from_id))
 ```
 
+### Geographic view of station delay
+
+Plotting average station delay at each station allows us to visualize more concretely how delays are playing out on a larger scale.
+
 ```{r}
-njtlines <- njtlines %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf()
+# njgin.line <- st_read("https://opendata.arcgis.com/datasets/e6701817be974795aecc7f7a8cc42f79_0.geojson")
+# njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0beff00600ee930f6_0.geojson")
 ```
 
-## Regression model training
+```{r}
+njtlines %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>%
+  st_as_sf() %>% filter(isWkdy) %>% group_by(to) %>%
+  summarise(avgDelay=mean(delay_minutes)) %>%
+  ggplot() + geom_sf(aes(color=avgDelay,size=avgDelay))
+```
 
-We introduce the time lag into our predictor set, with several intervals: 30 minutes, 1/1.5/2/3/12 hours, and one day. The correlation coefficients show that all have reasonably good correlation.
+## Regression model building and training
+
+We introduce the time lag into our predictor set, with several intervals: 30 minutes, 1/1.5/2/3/12 hours, and one day. The correlation coefficients show that the lags up to 3 hours have reasonably high correlation.
 
 ```{r time lags}
-njtlines <- njtlines %>% 
+njtlines <- njtlines %>% ungroup() %>% 
   arrange(from,interval30) %>% 
   mutate(lag30Min = dplyr::lag(delay_minutes,1),
          lag1Hour = dplyr::lag(delay_minutes,2),
@@ -376,36 +385,48 @@ as.data.frame(njtlines) %>%
 
 ### Correlation matrix
 
-```{r, fig.width=8,fig.height=8}
-njtlines %>% st_drop_geometry() %>% select_if(is.numeric) %>%
+Compiling the correlation matrix shows the relationship between all predictors to the response variable, *delay_minutes*, and each other.
+
+```{r correlation matrix, fig.width=8,fig.height=8}
+njtlines %>% select_if(is.numeric) %>%
   cor() %>% ggcorrplot(type="lower", method="circle") +
-  scale_size_continuous(range=c(1,8),)+
+  scale_size_continuous(range=c(1,8),) +
   labs(title = "Correlation matrix",
        subtitle = "Across numeric variables")
 ```
 
+### Model building
 
-Split our data into training and testing sets.
+We begin model training by log-transforming the delay time, in order to compensate for the natural left skew. Then create a training and testing dataset by splitting the dataset to before and after August.
 
 ```{r train_test, cache = TRUE}
-njtlines <- njtlines %>% mutate(logDelay = log(delay_minutes + 0.1)) %>%
-  filter(line %in% c('Northeast Corrdr','No Jersey Coast'))
+njtlines <- njtlines %>% mutate(logDelay = log(delay_minutes + 0.1))
 
-delay.Train <- filter(njtlines, date < ymd(20190701))
-delay.Test <- filter(njtlines, date >= ymd(20190701))
+delay.Train <- filter(njtlines, date < ymd(20190801))
+delay.Test <- filter(njtlines, date >= ymd(20190801))
 ```
 
-For our model, we select predictors like station segments, period of the day, whether it's weekday, direction, precipitation, cancel information, and time-lag.
+Our model uses a total of nineteen predictors, after repeated evaluation of predictor strength:
+- Categorical: line, to(station), time period, direction,
+- Numeric: Wind speed, total cancelled trains, trains cancelled for Amtrak, crew availability, equipment availability, mechanical issues, inter-station distance, delay lag by previous station, time lags 30 min/1/1.5/2/3/12 hours
+- Binary: is Weekday train
 
 ```{r}
-fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Precipitation +
+fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Wind_Speed +
             CANCEL_TOTAL + AMTRAK + crewAvail + 
-            `equipAvail` + Mechanical + inter.dist.mp +
+            equipAvail + Mechanical + inter.dist.mp + lagStation + 
             lag30Min + lag1Hour + lag90Min + lag2Hour + lag3Hour + lag12Hour,
           data=delay.Train)
-```
 
-Based on the model, here is the result of our predictions by station:
+f <- predict(fit, delay.Test)
+Test <- bind_cols(Test, as_tibble(f)) %>%
+          rename(Delay.Predict = value) %>%
+          mutate(Delay.Error = Delay.Predict - delay_minutes,
+               Delay.AbsError = abs(Delay.Predict - delay_minutes),
+               Delay.APE = (abs(Delay.Predict - delay_minutes)) / Delay.Predict)
+mae <- mean(Test$Delay.AbsError, na.rm=TRUE)
+mape <- mean(Test$Delay.APE, na.rm=TRUE)
+```
 
 ```{r stargazer, results='asis'}
 stargazer::stargazer(fit, type='html', align=TRUE, no.space=TRUE)
@@ -413,7 +434,7 @@ stargazer::stargazer(fit, type='html', align=TRUE, no.space=TRUE)
 
 ### Predictions on test data
 
-Our model results are promising, with the best predictive power being the model including the time lags. The mean absolute error for the test set by week is around 1.2 minutes, but cross-validated by hour of week, the distribution peaks at 0.1 minutes. 
+Our model results are promising, with the best predictive power being the model including the time lags. The mean absolute error for the test set by week is around 0.9 minutes, but cross-validated by hour of week, the distribution peaks at 0.1 minutes. 
 
 ```{r nest_data, message=FALSE, warning=FALSE, cache=TRUE}
 delay.Test.weekNest <- 
@@ -447,7 +468,9 @@ week_predictions %>%
     labs(title = "Mean Absolute Errors by week") + theme(legend.position='none')
 ```
 
-```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE}
+When we plot the predicted average delay against the observed delay, we notice that while "regular" phugoidal small delays of 4 minutes of less are well-predicted against, large delays of 7 minutes or more are more intermittently anticipated and predicted.
+
+```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE, fig.width=8}
 week_predictions %>% 
     mutate(interval30 = map(data, pull, interval30),
            from = map(data, pull, from),
@@ -457,6 +480,7 @@ week_predictions %>%
     gather(Variable, Value, -Regression, -interval30, -from, -direction) %>%
     group_by(Regression, Variable, interval30, direction) %>%
     summarize(Value = mean(Value)) %>%
+    filter(week(interval30) > 45) %>% 
     ggplot(aes(interval30, exp(Value)-0.1, colour=Variable)) + 
       geom_line(size = 0.5) + 
       facet_wrap(~direction, ncol=1) +
@@ -467,6 +491,8 @@ week_predictions %>%
 ```
 
 ## Cross-validation
+
+Incorporating cross-validation across space and time will help us understand where and how our predictions are holding up, as a measure of generalizability. 
 
 ```{r cv1, echo=FALSE}
 crossValidate <- function(dataset, id, dependentVariable, indVariables) {
@@ -499,7 +525,7 @@ crossValidate <- function(dataset, id, dependentVariable, indVariables) {
 ```
 
 ```{r cv2, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
-reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:21,sep=fixed(" + "))
+reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:19,sep=fixed(" + "))
 
 reg.cv.time <- crossValidate(
   dataset = delay.Test %>% mutate(day.hour = paste(dotw,hour(interval60))),
@@ -516,9 +542,9 @@ reg.cv.station <- crossValidate(
   dplyr::select(to, logDelay, Prediction)
 ```
 
-```{r, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+```{r cv by dotw-hour, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.cv.time %>%
-  group_by(day.hour) %>% 
+ group_by(day.hour) %>% 
   summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
             MAE = mean(abs(Mean_Error), na.rm = T)) %>%
   ungroup() %>%
@@ -529,7 +555,7 @@ reg.cv.time %>%
          x="Mean Absolute Error", y="Count")
 ```
 
-```{r cv3, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
+```{r cv by station, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.cv.station %>%
   group_by(to) %>% 
   summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
@@ -537,11 +563,13 @@ reg.cv.station %>%
   ungroup() %>% left_join(njtlines %>% filter(date %in% slice_sample(.)) %>% distinct(to,to_id),by='to') %>%
   left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf() %>% 
   ggplot() +
-  geom_sf(aes(color=MAE,size=MAE))
+  geom_sf(aes(color=MAE,size=MAE)) + scale_size_continuous(guide=F) +
+  labs(title='Mean Absolute Error by Station',
+       subtitle='Northeast Corridor and North Jersey Coast Line')
 ```
 
 ## Conclusion
 
-More work needs to be done in predicting large delays of 15 minutes and more better.
+On a macro level, our model appears to work with relative accuracy of `r mape` percent. This would indicate a fairly successful proof-of concept on paper for including delay predictions as a feature on customer-facing NJ Transit applications. 
 
 However, train delays are difficult to predict. It has less external, social factors but more hardcore engineering. We can point out certain factors relatively easily, whether because of bottlenecks on physical trackage; but not being able to to predict Amtrak dispatchers that actually control the traffic, and other incidents like mechanical issues, passenger-related delays. More data about the rolling stocks may help us to understand delays related to mechanical issues. 
