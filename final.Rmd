@@ -64,10 +64,11 @@ knitr::opts_chunk$set(fig.path = 'figs/',
                       echo = TRUE, warning = FALSE, message = FALSE, cache.lazy = FALSE)
 ```
 
-```{r}
+```{r, message=FALSE, echo=FALSE}
 library(caret)
 library(data.table)
 library(gganimate)
+library(ggcorrplot)
 library(gridExtra)
 library(hms)
 library(leaflet)
@@ -107,14 +108,20 @@ delay <- lapply(paste0('delay/',delay_files),read_csv) %>%
 names(delay) <- stringr::str_replace(delay_files, pattern = ".csv", replacement = "")
 ```
 
-We also load the GTFS data for verifying purposes.
+We also load the GTFS data for verifying purposes, and to get geographic stop time data
 
 ```{r intake GTFS data}
 njt <- read_gtfs("gtfs_njt.zip")
 njt_sf <- gtfs_as_sf(njt)
 ```
 
-Here we parse the time data.
+Here we begin to wrangle the delay data into a single dataset. A number of tasks are done:
+- Agency was filtered for NJ transit, and all imcomplete stops removed, including trains noted as invalid
+- Each stop time associated with a time period through the day, from AM peak to overnight
+- A dummy variable for noting if the stop time was on the weekday or weekend
+- Assessing the route direction of the train associated the stop time; eastbound is towards New York Penn, Hoboken, or Atlantic City, and westbound the opposite direction
+- Defining the absolute ordinal stop sequence of each route so numbers are consistent even when express trains skip stations
+- A dummy variable for assessing if the train is over 6 minutes late at the stop time
 
 ```{r 2019 NEC line delay data}
 njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>% 
@@ -136,6 +143,8 @@ njtlines <- rbindlist(delay %>% tidyselect:::select(starts_with('2019'))) %>%
   mutate(isLate = if_else(delay_minutes >= 6,1,0))
 ```
 
+We must also filter out faulty train runs that did not appear to record or change their timepoint when going from first to last station.
+
 ```{r filter for more runs that did not capture time change}
 first <- njtlines %>% group_by(date,train_id) %>% arrange(stop_sequence) %>% filter(row_number()==1) %>% rename('first_time' = 'actual_time') %>% select(date,train_id,first_time)
 
@@ -143,19 +152,23 @@ last <- njtlines %>% group_by(date,train_id) %>% arrange(-stop_sequence) %>% fil
 
 invalid2 <- first %>% left_join(last,by=c('date','train_id')) %>% filter(first_time == last_time)
 
-njtlines <- njtlines %>% anti_join(invalid2,by=c('date','train_id'))
+njtlines <- njtlines %>% anti_join(invalid2,by=c('date','train_id')) %>% filter(delay_minutes <= 240)
 ```
 
 
 ## Exploratory analysis and visualization
 
-```{r}
+We begin by displaying a simple histogram of the percentage of trains that are categorized as late each week, by line. Most lines show close to a normal distribution, with the Atlantic City Line notably skewed towards being more consistently late. The Princeton Shuttle (or Dinky) is only two stops, and thus is not expected to be noticably late.
 
+```{r}
+njtlines %>% group_by(line,week(date)) %>%
+  summarise(pctLate = sum(isLate==1)/sum(isLate %in% c(0,1))) %>% 
+  ggplot(aes(pctLate)) + geom_histogram() + facet_wrap(vars(line))
 ```
 
 ### Schedule deviance chart, faceted by time/direction of service
 
-Here we separated the trains based on the period of the day, and draw diagrams show the average delay through the entire journey of that period.
+Here we separated the trains based on the period of the day, and draw diagrams show the average delay through the entire journey of that period. Some signifiant time-space outliers in delays begin to appear, such as the Raritan Valley Line on westbound weekend overnights, which indicate that there is some underlying static pattern, such as maintenance or tight scheduling, that is causing consistent delays.
 
 ```{r schedule deviance summarise by time period, fig.width=10, fig.height=6}
   p1 <- njtlines %>% filter(isWkdy & line != "Atl. City Line") %>% group_by(line,direction,period,stop_seq_abs) %>%
@@ -165,7 +178,7 @@ Here we separated the trains based on the period of the day, and draw diagrams s
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
     ggtitle('Weekday') + theme(legend.position='none')
   p2 <- njtlines %>% filter(!isWkdy & line != "Atl. City Line") %>% group_by(line,direction,period,stop_seq_abs) %>%
-    summarise(avgdelacy = mean(delay_minutes)) %>% 
+    summarise(avgdelay = mean(delay_minutes)) %>% 
     ggplot(aes(x=stop_seq_abs, y=avgdelay, color=line)) +
     geom_line() +
     facet_grid(direction ~ factor(period,levels=c("AM peak","Midday","PM peak","Evening","Overnight"))) +
@@ -173,6 +186,8 @@ Here we separated the trains based on the period of the day, and draw diagrams s
   
   p1 / p2
 ```
+
+Compared to the other lines, we can see that the Atlantic City line has considerably higher baseline levels of delays. This is because in 2019, much of the ACRL was on maintenance due to ongoing positive train control signalling installation; the data snapshot here may not be indicative of future trends.
 
 ```{r schedule deviance ACRL, fig.width=10, fig.height=6}
   p1 <- njtlines %>% filter(isWkdy & line == "Atl. City Line") %>% group_by(direction,period,stop_seq_abs) %>%
@@ -204,6 +219,8 @@ njgin.station <- st_read("https://opendata.arcgis.com/datasets/4809dada94c542e0b
 ### Stringline diagram of one day's service
 
 Here we introduce the Stringline diagram. Used by transit agencies throughout the world, it is a visualized tool for rail dispatchers to quickly view train schedule and operation on a certain line. The x-axis is time and y are the stations spaced by their actual distance. In this Northeast Corridor stringline on a random day, we can see that westbound trains are consistently more late than eastbound ones, a predictor that is of particular importance.
+
+To accurately display the stringline we first get the milepost distance of each station, which is the approximate track-mileage distance of each station from a defined terminal like New York Penn Station. The inter-station milepost distance, or station spacing, was also recorded and included as a predictor.
 
 ```{r set inter-station distance}
 milepost <- read_csv("milepost.csv")
@@ -238,7 +255,7 @@ Weather has impacts on trains running significantly late. However, the weathers 
 
 ```{r weather}
 weather.DataNWK <- 
-  riem_measures(station = "EWR", date_start = "2018-03-01", date_end = "2019-12-31")
+  riem_measures(station = "EWR", date_start = "2019-01-01", date_end = "2019-12-31")
 
 weather.PanelNWK <-  
   weather.DataNWK %>%
@@ -280,7 +297,7 @@ njtlines <- njtlines %>%
 
 One open data set from NJT is particularly valuable: cancellations by month categorized by reason. This is a direct test of the theory that knock-on disruptions to one train can propagate into other trains close in time. 
 
-We also found something interesting completely by accident: a spike of train cancellations in June 2019 is due to [labor disputes](https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html), that resulted in a local peak for average train delay. 
+The data here also reflects a spontaneous and episodic incident that was previously not considered: a spike of train cancellations in June 2019 is due to [labor disputes](https://www.nj.com/traffic/2019/06/nj-transit-engineers-refuse-to-work-ot-as-part-of-dispute-your-commute-will-get-worse.html), that resulted in a local peak for average train delay. 
 
 ```{r cancelled trains}
 cancel <- bind_rows(
@@ -316,7 +333,8 @@ cancel <- cancel %>% select(-CANCEL_PERCENTAGE) %>%
   pivot_wider(names_from=CATEGORY,values_from=CANCEL_COUNT) %>%
   rename(crewAvail = `Crew/Engineer Availability`,
          equipAvail = `Equipment Availability`,
-         humanFactor = `Human Factor`)
+         humanFactor = `Human Factor`,
+         infraEng = `Infrastructure Engineering`)
 
 njtlines <- njtlines %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper(month(date, label=T, abbr=F))) %>% 
   left_join(cancel,by=c('line','YEAR','MONTH')) %>% mutate_if(is.numeric,coalesce,0) %>% 
@@ -324,15 +342,13 @@ njtlines <- njtlines %>% mutate(YEAR=as.character(year(date)),MONTH=str_to_upper
          to_id = as.character(to_id),from_id = as.character(from_id))
 ```
 
-### Add geography
-
 ```{r}
 njtlines <- njtlines %>% left_join(dplyr::select(njt_sf$stops,stop_id,zone_id,geometry),by=c("to_id"="stop_id")) %>% st_as_sf()
 ```
 
 ## Regression model training
 
-Add time lag into our models.
+We introduce the time lag into our predictor set, with several intervals: 30 minutes, 1/1.5/2/3/12 hours, and one day. The correlation coefficients show that all have reasonably good correlation.
 
 ```{r time lags}
 njtlines <- njtlines %>% 
@@ -358,6 +374,17 @@ as.data.frame(njtlines) %>%
     summarize(correlation = round(cor(Value, delay_minutes),2))
 ```
 
+### Correlation matrix
+
+```{r, fig.width=8,fig.height=8}
+njtlines %>% st_drop_geometry() %>% select_if(is.numeric) %>%
+  cor() %>% ggcorrplot(type="lower", method="circle") +
+  scale_size_continuous(range=c(1,8),)+
+  labs(title = "Correlation matrix",
+       subtitle = "Across numeric variables")
+```
+
+
 Split our data into training and testing sets.
 
 ```{r train_test, cache = TRUE}
@@ -372,7 +399,7 @@ For our model, we select predictors like station segments, period of the day, wh
 
 ```{r}
 fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Precipitation +
-            CANCEL_TOTAL + AMTRAK + `crewAvail` + 
+            CANCEL_TOTAL + AMTRAK + crewAvail + 
             `equipAvail` + Mechanical + inter.dist.mp +
             lag30Min + lag1Hour + lag90Min + lag2Hour + lag3Hour + lag12Hour,
           data=delay.Train)
