@@ -94,7 +94,7 @@ int.overngt <- interval(as_hms("00:00:00"),as_hms("05:59:59"))
 
 ## Kaggle data wrangling
 
-Here we load and clean the initial delay data. Uploaded to Kaggle in 2020, it is a snapshot of the real-time departure times of nearly every NJ Transit train at each station from March 2018 to May 2020, compared to their scheduled departure time. For analysis purposes, it was decided to restrict the analysis timeframe to 2019 only, as data from 2018 was found to be relatively spotty, and 2020's data factors were of course marred by the pandemic
+Here we load and clean the initial delay data. Uploaded to Kaggle in 2020, it is a snapshot of the real-time departure times of nearly every NJ Transit train at each station from March 2018 to May 2020, compared to their scheduled departure time. For analysis purposes, it was decided to restrict the analysis timeframe to 2019 only, as data from 2018 was found to be relatively spotty, and 2020's data factors were of course marred by the pandemic. In addition, because of continued rendering issues, the rail lines for analysis were limited to the Northeast Corridor and North Jersey Coast Line
 
 ```{r intake delay data, echo=FALSE, message=FALSE}
 invalid <- rbind(read_csv("delay/invalid_trains.csv"),read_csv("delay/invalid_trains_05-01-19_05-18-20.csv"))
@@ -227,7 +227,7 @@ njtlines <- njtlines %>%
   mutate(inter.dist.mp=abs(from.dist.mp-to.dist.mp))
 ```
 
-```{r stringline diagram, fig.width=6, fig.height=4}
+```{r stringline diagram, fig.width=10, fig.height=6}
 oneday <- njtlines %>% ungroup() %>% filter(line == "Northeast Corrdr" & date %in% slice_sample(.)) %>%
   mutate(to.dist.mp=to.dist.mp*-1)
 
@@ -397,7 +397,7 @@ njtlines %>% select_if(is.numeric) %>%
 
 ### Model building
 
-We begin model training by log-transforming the delay time, in order to compensate for the natural left skew. Then create a training and testing dataset by splitting the dataset to before and after August.
+We begin model training by log-transforming the delay time, in order to compensate for the natural left skew of delays (many small, few large). Then create a training and testing dataset by splitting the dataset to before and after August.
 
 ```{r train_test, cache = TRUE}
 njtlines <- njtlines %>% mutate(logDelay = log(delay_minutes + 0.1))
@@ -419,7 +419,7 @@ fit <- lm(logDelay ~ line + to + period + isWkdy + direction + Wind_Speed +
           data=delay.Train)
 
 f <- predict(fit, delay.Test)
-Test <- bind_cols(Test, as_tibble(f)) %>%
+Test <- bind_cols(delay.Test, as_tibble(f)) %>%
           rename(Delay.Predict = value) %>%
           mutate(Delay.Error = Delay.Predict - delay_minutes,
                Delay.AbsError = abs(Delay.Predict - delay_minutes),
@@ -431,6 +431,8 @@ mape <- mean(Test$Delay.APE, na.rm=TRUE)
 ```{r stargazer, results='asis'}
 stargazer::stargazer(fit, type='html', align=TRUE, no.space=TRUE)
 ```
+
+Based on the test data alone, we can evaluate the initial quality of the linear model through goodness of fit metrics. When trying to predict the delay for each station arrival data point on the exact same test data, the interval between what is predicted through the model and what was actually observed is the error; averaged we can find the Mean Absolute Error (MAE). In addition, the Mean Absolute Percent Error (MAPE) finds what percentage of trains were predicted incorrectly.  was found to be `r mae` minutes, and the MAPE was `r mape`. 
 
 ### Predictions on test data
 
@@ -468,7 +470,7 @@ week_predictions %>%
     labs(title = "Mean Absolute Errors by week") + theme(legend.position='none')
 ```
 
-When we plot the predicted average delay against the observed delay, we notice that while "regular" phugoidal small delays of 4 minutes of less are well-predicted against, large delays of 7 minutes or more are more intermittently anticipated and predicted.
+When we plot the predicted average delay against the observed delay, we notice that while "regular" periodic small delays of 4 minutes of less are well-predicted against, large delays of 7 minutes or more are more intermittently anticipated and predicted.
 
 ```{r error_vs_actual_timeseries, cache = TRUE, warning = FALSE, message = FALSE, fig.width=8}
 week_predictions %>% 
@@ -492,7 +494,7 @@ week_predictions %>%
 
 ## Cross-validation
 
-Incorporating cross-validation across space and time will help us understand where and how our predictions are holding up, as a measure of generalizability. 
+In linear models, is is always important to repeat predictions on test data on multiple dimensions, known as cross-validation. If the initial accuracy found above holds for these additional dimensions, then we can say the model has a high degree of *generalizblity* and is not badly overfit onto this specific instance of training data. Incorporating cross-validation across space and time will help us understand where and how our predictions are holding up.
 
 ```{r cv1, echo=FALSE}
 crossValidate <- function(dataset, id, dependentVariable, indVariables) {
@@ -528,11 +530,12 @@ crossValidate <- function(dataset, id, dependentVariable, indVariables) {
 reg.vars <- word(str_sub(str_replace_all(toString(fit$terms[[3]]),'\\,', ' +'),5),1:19,sep=fixed(" + "))
 
 reg.cv.time <- crossValidate(
-  dataset = delay.Test %>% mutate(day.hour = paste(dotw,hour(interval60))),
+  dataset = delay.Test %>% mutate(day.hour = paste(dotw,hour(interval60)),
+                                  isWkdy = ifelse(wday(interval60) %in% c(2,3,4,5,6),TRUE,FALSE)),
   id = "day.hour",
   dependentVariable = "logDelay",
   indVariables = reg.vars) %>%
-  dplyr::select(day.hour, logDelay, Prediction)
+  dplyr::select(isWkdy, day.hour, logDelay, Prediction)
 
 reg.cv.station <- crossValidate(
   dataset = delay.Test,
@@ -542,9 +545,13 @@ reg.cv.station <- crossValidate(
   dplyr::select(to, logDelay, Prediction)
 ```
 
+### Cross-validation by time
+
+When cross-validated by time, we can see the the MAE is significantly minimized to near-zero; however there are a few large spikes that persist
+
 ```{r cv by dotw-hour, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.cv.time %>%
- group_by(day.hour) %>% 
+ group_by(isWkdy,day.hour) %>% 
   summarize(Mean_Error = mean(Prediction - logDelay, na.rm = T),
             MAE = mean(abs(Mean_Error), na.rm = T)) %>%
   ungroup() %>%
@@ -552,8 +559,13 @@ reg.cv.time %>%
     geom_histogram(aes(MAE), bins = 30) +
     geom_vline(xintercept = 0) + 
     labs(title="Cross-validation: mean average error", subtitle = "k-fold cross validation: Day of Week + Hour",
-         x="Mean Absolute Error", y="Count")
+         x="Mean Absolute Error", y="Count") +
+  facet_wrap(vars(isWkdy))
 ```
+
+### Cross-validation by space (station)
+
+For CV by station, we see notable spikes in errors at terminal stations, where trains start their run later than scheduled, as well as at the mid-points of lines like the North Jersey Coast Line that continues outward. These can be chalked up to more particular operational quirks that currently do not have any relevant open-facing data attached to them.
 
 ```{r cv by station, echo=FALSE, warning=FALSE, message = FALSE, cache = TRUE}
 reg.cv.station %>%
@@ -570,6 +582,10 @@ reg.cv.station %>%
 
 ## Conclusion
 
-On a macro level, our model appears to work with relative accuracy of `r mape` percent. This would indicate a fairly successful proof-of concept on paper for including delay predictions as a feature on customer-facing NJ Transit applications. 
+On a macro level, our model appears to work with relative accuracy of `r mape` percent. This would indicate a fairly successful proof-of concept on paper for including delay predictions as a feature on customer-facing NJ Transit applications. That there was indeed a relatively periodic cycle of baseline delays found is already a significant insight that should be disseminated far and wide. We recommend that NJ Transit begin to incorporate this model both into customer-facing apps and websites, and also into internal dashboards. Most significantly, because of the great ease in capturing delay data, this model can also theoretically be updated on a relatively frequent basis as well. Schedule planners can then begin to adjust schedules to anticipate delays more frequently, right-of-way personnel can start to notice physical plant factors that cause delays sooner, and overall NJ Transit's commuter rail network can be more robust to delays.
 
-However, train delays are difficult to predict. It has less external, social factors but more hardcore engineering. We can point out certain factors relatively easily, whether because of bottlenecks on physical trackage; but not being able to to predict Amtrak dispatchers that actually control the traffic, and other incidents like mechanical issues, passenger-related delays. More data about the rolling stocks may help us to understand delays related to mechanical issues. 
+However, at this stage we are beginning to see the limits of solely relying on public-facing data, especially in the context of a relatively closed system such as transit. As a system, transit has fewer external socioeconomic factors that are frequently and abundantly captured in open data; on the contrary, most data are captive to the department or division that directly captured it for internal purposes only. Nominally, there is indeed little reason why any given person would want data on known trackage bottlenecks, rolling stock performance figures, dispatch accuracy (particularly important for start of runs!) trip-level passenger boarding data, and thousands of other possible data points. We can point out certain factors relatively easily, whether because of bottlenecks on physical trackage; but not being able to to predict Amtrak dispatchers that actually control the traffic, and other incidents like mechanical issues, passenger-related delays. Thus, working directly with NJ Transit Operations and Maintenance personnel and sharing this previously isolated data may help us to understand delays on a more sophisticated level.
+
+In addition, there is still the distinct possibility that any seemingly random or spontaneous factor could affect delays at any time, too rapid or too abstract to quantify for use in this model. June 2019's labor disruptions was an example, as is the continuing pandemic and the effects it has on overall ridership, particularly on known bottlenecks such as boarding at terminal stations. Very likely, delays as a matter of pure passenger operations will continue to minimize at peak hours, and perhaps persist in off-peak hours if customers shift towards riding off-peak. The pandemic has not only shifted ridership, but fundamentally how NJ Transit's workforce and operations might perhaps be operated on a daily basis, and this needs to be anticipated as well.
+
+Future steps to be taken with this model abound. As said, the pandemic makes all pre-2020 data somewhat outdated in retrospect, and this model will have to be repeated through at least a full year in 2021 if immediate utility is to be prioritized. Secondly, expanding this model across all lines can be possible with more computing power and memory. In addition, delay interactions with other modes should be explored: Amtrak's presence on the Northeast Corridor alone is a major factor, as trains there are actually all dispatched by Amtrak staff and Amtrak trains are usually prioritized. Integrating the possibilty of bus and light rail connections, both on NJT and neighboring systems, could be interesting to see if intermodal transfers are already being affected through delays on the single system of commuter rail. And lastly, it is of great interest to model scenarios where potential disruptive interventions, such as a new Hudson River Tunnel, could minimize delays to a quantifiable and definitive extent. Knowing exactly how much any given rider's commute could be improved through investments makes it a powerful tool for advocates and politicians to argue for them, to ensure the continued operating stability and growth of NJ Transit and all transit agencies.
