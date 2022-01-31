@@ -1,1 +1,5 @@
 theme: jekyll-theme-minimal 
+logo: /assets/img/logo.png
+description: NJT train delay prediction and web app
+show_downloads: false
+google_analytics:
